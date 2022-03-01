@@ -3,7 +3,7 @@
 </div>
 <br></br>
 
-FastLink. Blazing fast, memory-efficient Lavalink wrapper using Node.js.
+FastLink. High performance, memory-efficient Lavalink wrapper using Node.js.
 
 # Informations
 
