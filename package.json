@@ -1,0 +1,10 @@
+{
+  "name": "fastlink",
+  "version": "1.0.0",
+  "description": "Blazing fast, memory-efficient Lavalink wrapper using Node.js.",
+  "main": "index.js",
+  "type": "module",
+  "keywords": [ "memory-efficient", "lavalink", "wrapper" ],
+  "author": "Pedro.js#9446",
+  "license": "Apache-2.0"
+}
