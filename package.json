@@ -6,7 +6,12 @@
   "type": "module",
   "author": "Pedro.js#9446",
   "license": "Apache-2.0",
-  "keywords": [ "Lightweight", "memory-efficient", "lavalink", "wrapper" ],
+  "keywords": [
+    "Lightweight",
+    "memory-efficient",
+    "lavalink",
+    "wrapper"
+  ],
   "dependencies": {
     "ws": "^8.5.0"
   },
