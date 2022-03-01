@@ -6,7 +6,7 @@
   </br>
 </div>
 
-FastLink. High performance, memory-efficient Lavalink wrapper using Node.js.
+FastLink. Blazing fast, memory-efficient Lavalink wrapper using Node.js.
 
 # Informations
 
@@ -64,18 +64,18 @@ FastLink. High performance, memory-efficient Lavalink wrapper using Node.js.
   Get the Lavalink events.
 
   ```js
-  getEvents()
+  getLavalinkEvents()
   ```
 
   Example:
 
   ```js
-  let events = getEvents()
+  let events = getLavalinkEvents()
 
-  events.on('trackStartEvent', () => console.log('Track started'))
+  events.on('trackStart', () => console.log('Track started'))
   ```
 
-  Observation: It can emit "raw", "stats", "playerUpdate", "trackStartEvent", "TrackStuckEvent", "TrackEndEvent", "TrackExceptionEvent", "WebSocketClosedEvent" and "unknown" events.
+  Observation: It can emit "nodeConnect", "nodeClose", "nodeError", "raw", "stats", "playerUpdate", "trackStart", "TrackStuck", "TrackEnd", "TrackException", "WebSocketClosed", "unknownType" and "unknownOp" events.
 
 ## Get Player
 
