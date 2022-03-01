@@ -4,10 +4,17 @@
   "description": "Lightweight, memory-efficient Lavalink wrapper using Node.js.",
   "main": "index.js",
   "type": "module",
+  "author": "Pedro.js#9446",
+  "license": "Apache-2.0",
+  "keywords": [ "Lightweight", "memory-efficient", "lavalink", "wrapper" ],
   "dependencies": {
     "ws": "^8.5.0"
   },
-  "keywords": [ "Lightweight", "memory-efficient", "lavalink", "wrapper" ],
-  "author": "Pedro.js#9446",
-  "license": "Apache-2.0"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ThePedroo/FastLink.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ThePedroo/FastLink/issues"
+  }
 }
