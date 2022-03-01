@@ -6,7 +6,7 @@
   </br>
 </div>
 
-FastLink. Blazing fast, memory-efficient Lavalink wrapper using Node.js.
+FastLink. Lightweight, memory-efficient Lavalink wrapper using Node.js.
 
 # Informations
 
@@ -17,6 +17,16 @@ FastLink. Blazing fast, memory-efficient Lavalink wrapper using Node.js.
 # Observations
 
   Do NOT use functions to join voice channel of your library, they will handle voiceUpdate, and Lavalink already do that.
+
+## Before using the functions
+
+  Before you use the function, import the FastLink in your code with:
+
+  ```js
+  const Lavalink = require('fastlink')
+  // or with ES6
+  import Lavalink from 'fastlink'
+  ```
 
 ## Connect Node
 
@@ -31,13 +41,13 @@ FastLink. Blazing fast, memory-efficient Lavalink wrapper using Node.js.
   ```js
   // Discord.js example
 
-  connectNode([{ host: 'example.com', secure: true, password: 'youshallnotpass', port: undefined }], { shards: 1, botId: '1234567891011121314' }, (guildId, payload) => {
+  Lavalink.connectNode([{ host: 'example.com', secure: true, password: 'youshallnotpass', port: undefined }], { shards: 1, botId: '1234567891011121314' }, (guildId, payload) => {
     client.guilds.cache.get(guildId).shard.send(payload)
   })
 
   // Eris example
 
-  connectNode([{ host: 'example.com', secure: true, password: 'youshallnotpass', port: undefined }], { shards: 1, botId: '1234567891011121314' }, (guildId, payload) => {
+  Lavalink.connectNode([{ host: 'example.com', secure: true, password: 'youshallnotpass', port: undefined }], { shards: 1, botId: '1234567891011121314' }, (guildId, payload) => {
     client.guilds.get(guildId).shard.ws.send(payload)
   })
   ```
@@ -55,8 +65,8 @@ FastLink. Blazing fast, memory-efficient Lavalink wrapper using Node.js.
   Example:
 
   ```js
-  client.on('raw', (data) => handleRaw(data)) // Discord.Js
-  client.on('rawWS', (data) => handleRaw(data)) // Eris
+  client.on('raw', (data) => Lavalink.handleRaw(data)) // Discord.Js
+  client.on('rawWS', (data) => Lavalink.handleRaw(data)) // Eris
   ```
 
 ## Get Lavalink Events
@@ -70,12 +80,26 @@ FastLink. Blazing fast, memory-efficient Lavalink wrapper using Node.js.
   Example:
 
   ```js
-  let events = getLavalinkEvents()
+  let events = Lavalink.getLavalinkEvents()
 
   events.on('trackStart', () => console.log('Track started'))
   ```
 
   Observation: It can emit "nodeConnect", "nodeClose", "nodeError", "raw", "stats", "playerUpdate", "trackStart", "TrackStuck", "TrackEnd", "TrackException", "WebSocketClosed", "unknownType" and "unknownOp" events.
+
+## createPlayer
+
+  Creates a player in a server.  
+
+  ```js
+  createPlayer({ guildId: <PRIu64 or String>, voiceChannelId: <PRIu64 or String> })
+  ```
+
+  Example:
+
+  ```js
+  const player = Lavalink.createPlayer({ guildId: '1234567891011121314', voiceChannelId: '1234567891011121314' })
+  ```
 
 ## Get Player
 
@@ -88,7 +112,7 @@ FastLink. Blazing fast, memory-efficient Lavalink wrapper using Node.js.
   Example:
 
   ```js
-  const player = getPlayer('1234567891011121314')
+  const player = Lavalink.getPlayer('1234567891011121314')
 
   let track = player.search('Rick roll')
 
@@ -106,23 +130,9 @@ FastLink. Blazing fast, memory-efficient Lavalink wrapper using Node.js.
   Example:
 
   ```js
-  const players = getAllPlayers()
+  const players = Lavalink.getAllPlayers()
 
   players.forEach((x) => console.log(x))
-  ```
-
-## createPlayer
-
-  Creates a player in a server.  
-
-  ```js
-  createPlayer({ guildId: <PRIu64 or String>, voiceChannelId: <PRIu64 or String> })
-  ```
-
-  Example:
-
-  ```js
-  const player = createPlayer({ guildId: '1234567891011121314', voiceChannelId: '1234567891011121314' })
   ```
 
 ### Connect
@@ -136,7 +146,7 @@ FastLink. Blazing fast, memory-efficient Lavalink wrapper using Node.js.
   Example:
 
   ```js
-  const player = createPlayer({ guildId: '1234567891011121314', voiceChannelId: '1234567891011121314' })
+  const player = Lavalink.createPlayer({ guildId: '1234567891011121314', voiceChannelId: '1234567891011121314' })
 
   player.connect()
   ```
@@ -184,7 +194,7 @@ FastLink. Blazing fast, memory-efficient Lavalink wrapper using Node.js.
   ```js
   let track = player.search('Rick roll')
 
-  player.play(track.tracks[0].trac)
+  player.play(track.tracks[0].track)
 
   setTimeout(() => {
     player.stop()
@@ -204,7 +214,7 @@ FastLink. Blazing fast, memory-efficient Lavalink wrapper using Node.js.
   ```js
   let track = player.search('Rick roll')
 
-  player.play(track.tracks[0].trac)
+  player.play(track.tracks[0].track)
 
   setTimeout(() => {
     player.stop()
@@ -224,7 +234,7 @@ FastLink. Blazing fast, memory-efficient Lavalink wrapper using Node.js.
   ```js
   let track = player.search('Rick roll')
 
-  player.play(track.tracks[0].trac)
+  player.play(track.tracks[0].track)
   player.setVolume(200)
   ```
 
@@ -241,7 +251,7 @@ FastLink. Blazing fast, memory-efficient Lavalink wrapper using Node.js.
   ```js
   let track = player.search('Rick roll')
 
-  player.play(track.tracks[0].trac)
+  player.play(track.tracks[0].track)
 
   setTimeout(() => {
     player.setPaused()
