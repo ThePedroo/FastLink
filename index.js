@@ -7,9 +7,11 @@ const Event = new events()
 const map = new Map()
 
 const nodeInfos = []
+
 let sendPayload;
 
-function connectNode(object, infos, sendFunction) {
+function connectNode(object, infos, sPayload) {
+  sendPayload = sPayload
   let ws = new WebSocket(`${object.secure ? 'wss://' : 'ws://'}${object.host}${object.port != undefined ? `:${object.port}` : ''}`, undefined, {
     headers: {
       Authorization: object.password,
@@ -19,12 +21,11 @@ function connectNode(object, infos, sendFunction) {
     }
   })
 
-  sendPayload = sendFunction
-
   nodeInfos.push({
     "Password": object.password,
     "UserId": infos.botId,
     "Port": object.port ? object.port : 443,
+    "Queue": infos.handleQueue,
     "Ws": ws
   })
 
@@ -32,30 +33,32 @@ function connectNode(object, infos, sendFunction) {
     if (infos.debug) console.log('[ FASTLINK ] Node connected')
     Event.emit('nodeConnected')
   })
+
+  ws.on('close', () => {
+    if (infos.debug) console.warn(`[ FASTLINK ] Node closed connection unexpectally.`)
+    Event.emit('nodeClose')
+  })
   
   ws.on('error', (err) => {
     if (infos.debug) console.warn(`[ FASTLINK ] Failed to connect to node.`)
     Event.emit('nodeError', (err))
   })
   
-  ws.on('close', () => {
-    if (infos.debug) console.warn(`[ FASTLINK ] Node closed connection unexpectally.`)
-    Event.emit('nodeClose')
-  })
-  
   ws.on('message', (data) => {
     if (data) data = JSON.parse(data)
 
     Event.emit('raw', data)
-
+  
     switch(data.op) {
       case 'stats': {
         if (infos.debug) console.log('[ FASTLINK ] stats object received.')
+        delete data['op']
         Event.emit('stats', data)
         break
       }
       case 'playerUpdate': {
         if (infos.debug) console.log('[ FASTLINK ] playerUpdate object received.')
+        delete data['op']
         Event.emit(data.op, data)
         break
       }
@@ -63,27 +66,106 @@ function connectNode(object, infos, sendFunction) {
         switch(data.type) {
           case 'TrackStartEvent': {
             if (infos.debug) console.log('[ FASTLINK ] trackStart object received.')
+
+            delete data['op']
+            delete data['type']
             Event.emit('trackStart', data)
+
             break
           }
           case 'TrackStuckEvent': {
             if (infos.debug) console.log('[ FASTLINK ] trackStuck object received.')
+
+            delete data['op']
+            delete data['type']
             Event.emit('trackStuck', data)
+
+            let queue = map.get('queue') || {}
+
+            if (nodeInfos[0].Queue) {
+              if (data.fakeTrack) {
+                let response = sendJson({ op: 'play', guildId: data.guildId, track: data.fakeTrack, noReplace: false, pause: false })
+                if (response?.error == true) throw new Error(response.message)
+
+                queue[data.guildId] = []
+                queue[data.guildId].push(data.fakeTrack)
+              } else if(queue[data.guildId] && queue[data.guildId][1]) {
+                let response = sendJson({ op: 'play', guildId: data.guildId, track: queue[data.guildId][1], noReplace: false, pause: false })
+                if (response?.error == true) throw new Error(response.message)
+              
+                queue[data.guildId].shift()
+              } else if (queue[data.guildId] && queue[data.guildId][0] && !queue[data.guildId][1]) {              
+                delete queue[data.guildId]
+                map.set('queue', queue)
+              }
+            }
+
             break
           }
           case 'TrackEndEvent': {
             if (infos.debug) console.log('[ FASTLINK ] trackEnd object received.')
+
+            delete data['op']
+            delete data['type']
             Event.emit('trackEnd', data)
+
+            let queue = map.get('queue') || {}
+              
+            if (nodeInfos[0].Queue) {
+              if (data.fakeTrack) {
+                let response = sendJson({ op: 'play', guildId: data.guildId, track: data.fakeTrack, noReplace: false, pause: false })
+                if (response?.error == true) throw new Error(response.message)
+
+                queue[data.guildId] = []
+                queue[data.guildId].push(data.fakeTrack)
+              } else if(queue[data.guildId] && queue[data.guildId][1]) {
+                let response = sendJson({ op: 'play', guildId: data.guildId, track: queue[data.guildId][1], noReplace: false, pause: false })
+                if (response?.error == true) throw new Error(response.message)
+              
+                queue[data.guildId].shift()
+              } else if (queue[data.guildId] && queue[data.guildId][0] && !queue[data.guildId][1]) {              
+                delete queue[data.guildId]
+                map.set('queue', queue)
+              }
+            }
+
             break
           }
           case 'TrackExceptionEvent': {
             if (infos.debug) console.log('[ FASTLINK ] trackException object received.')
+            delete data['op']
+            delete data['type']
             Event.emit('trackException', data)
+
+            let queue = map.get('queue') || {}
+
+            if (nodeInfos[0].Queue) {
+              if (data.fakeTrack) {
+                let response = sendJson({ op: 'play', guildId: data.guildId, track: data.fakeTrack, noReplace: false, pause: false })
+                if (response?.error == true) throw new Error(response.message)
+
+                queue[data.guildId] = []
+                queue[data.guildId].push(data.fakeTrack)
+              } else if(queue[data.guildId] && queue[data.guildId][1]) {
+                let response = sendJson({ op: 'play', guildId: data.guildId, track: queue[data.guildId][1], noReplace: false, pause: false })
+                if (response?.error == true) throw new Error(response.message)
+              
+                queue[data.guildId].shift()
+              } else if (queue[data.guildId] && queue[data.guildId][0] && !queue[data.guildId][1]) {              
+                delete queue[data.guildId]
+                map.set('queue', queue)
+              }
+            }
+
             break
           }
           case 'WebSocketClosedEvent': {
             if (infos.debug) console.log('[ FASTLINK ] websocketClosed object received.')
+
+            delete data['op']
+            delete data['type']
             Event.emit('websocketClosed', data)
+
             break
           }
           default: {
@@ -124,12 +206,16 @@ function handleRaw(data) {
         "event": data.d
       })
       if (response?.error == true) throw new Error(response.message)
+
       delete sessionIds[data.d.guild_id.toString()]
       map.set('sessionIds', sessionIds)
     }
   } else {
+    if (!data.d.session_id) return;
+
     let sessionIds = map.get('sessionIds') || {}
     sessionIds[data.d.guild_id.toString()] = data.d.session_id.toString()
+
     if (data.d.member.user.id == nodeInfos[0].UserId) map.set('sessionIds', sessionIds)
   }
 }
@@ -157,13 +243,24 @@ class PlayerFunctions {
   }
   play(track, noReplace = false) {
     if (typeof track != 'string') throw new Error('track field must be a string.')
-  
-    let response = sendJson({ op: 'play', guildId: this.config.guildId, track, noReplace: typeof noReplace != 'boolean' ? false : noReplace, pause: false })
-    if (response?.error == true) throw new Error(response.message)
 
     let players = map.get('players') || {}
+    let queue = map.get('queue') || {}
       
-    players[this.config.guildId.toString()] = { voiceChannelId: this.config.voiceChannelId, playing: true, track, paused: false }
+    players[this.config.guildId] = { voiceChannelId: this.config.voiceChannelId, playing: true, track, paused: false }
+
+    if (nodeInfos[0].Queue) {
+      if (queue[this.config.guildId] && queue[this.config.guildId][0]) {
+        queue[this.config.guildId].push(track)
+      } else {
+        nodeInfos[0].Ws.emit('message', JSON.stringify({ op: 'event', type: 'TrackEndEvent', guildId: this.config.guildId.toString(), fakeTrack: track }))    
+      }
+    } else {
+      let response = sendJson({ op: 'play', guildId: this.config.guildId, track: track, noReplace: false, pause: false })
+      if (response?.error == true) throw new Error(response.message)
+    }
+    
+    map.set('queue', queue)
     map.set('players', players)
   }
   search(music) {
@@ -224,13 +321,29 @@ function createPlayer(config) {
 function getPlayer(guildId) {
   if (typeof guildId != 'string' && typeof guildId != 'number') throw new Error('guildId field must be a string or a number.')
 
-  let guildPlayer = map.get('players')[guildId.toString()]
-    
-  if (guildPlayer) return (new PlayerFunctions({ guildId, voiceChannelId: guildPlayer.voiceChannelId }))
+  let guildPlayer = map.get('players')
+  
+  if (guildPlayer && guildPlayer[guildId]) {
+    return (new PlayerFunctions({ guildId, voiceChannelId: guildPlayer[guildId].voiceChannelId }))
+  }
 }
 
 function getAllPlayers() {
   return map.get('players')
 }
 
-export default { connectNode, handleRaw, getLavalinkEvents, createPlayer, getPlayer, getAllPlayers }
+function getQueue(guildId) {
+  if (typeof guildId != 'string' && typeof guildId != 'number') throw new Error('guildId field must be a string or a number.')
+
+  let guildQueue = map.get('queue')
+  
+  if (guildQueue && guildQueue[guildId]) {
+    return guildQueue[guildId]
+  }
+}
+
+function getAllQueues() {
+  return map.get('queue')
+}
+
+export default { connectNode, handleRaw, getLavalinkEvents, createPlayer, getPlayer, getAllPlayers, getQueue, getAllQueues }
