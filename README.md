@@ -33,7 +33,7 @@ FastLink. Lightweight, memory-efficient Lavalink wrapper using Node.js.
   Connects to a Lavalink node.
 
   ```js
-  connectNode([{ host: <String>, secure: <Boolean>, password: <String>, port: <Int or boolean> }], { shards: <Int>, botId: <PRIu64 or String> }, <Function>)
+  connectNode([{ host: <String>, secure: <Boolean>, password: <String>, port: <Int or boolean> }], { shards: <Int>, botId: <PRIu64 or String>, handleQueue: <Boolean> }, <Function>)
   ```
 
   Example:
@@ -52,7 +52,7 @@ FastLink. Lightweight, memory-efficient Lavalink wrapper using Node.js.
   })
   ```
 
-  Observation: Just one node is supported for now.
+  Observation: Just one node is supported for now, and handleQueue will make FastLink make and handle a music queue.
 
 ## Handle Discord Raw event
 
@@ -119,6 +119,22 @@ FastLink. Lightweight, memory-efficient Lavalink wrapper using Node.js.
   player.play(track.tracks[0].track)
   ```
 
+## Get Queue
+
+  Gets a queue, good for see what's the current music and see what's next.
+
+  ```js
+  getQueue(<PRIu64 or String>)
+  ```
+
+  Example:
+
+  ```js
+  const queue = Lavalink.getQueue('1234567891011121314')
+
+  console.log(queue)
+  ```
+
 ## Get all Players
 
   Get all players, paused, playing or stopped.
@@ -133,6 +149,22 @@ FastLink. Lightweight, memory-efficient Lavalink wrapper using Node.js.
   const players = Lavalink.getAllPlayers()
 
   players.forEach((x) => console.log(x))
+  ```
+
+## Get all Queues
+
+  Get all queues with musics.
+
+  ```js
+  getAllQueues()
+  ```
+
+  Example:
+
+  ```js
+  const queues = Lavalink.getAllQueues()
+
+  queues.forEach((x) => console.log(x))
   ```
 
 ### Connect
