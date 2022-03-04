@@ -5,7 +5,7 @@ An lightweight, memory-efficient Lavalink wrapper using Node.js.
 
 # Documentation
 
-  You can take a look at the documentation at [GitHub](https://github.com/ThePedroo/FastLink/docs)
+  You can take a look at the documentation at [GitHub](https://github.com/ThePedroo/FastLink/tree/main/docs)
   
   You can suggest ideas for add to the documentation.
 
