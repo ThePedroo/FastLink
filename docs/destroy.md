@@ -1,6 +1,6 @@
 # Destroy
 
-  Destroys a specific player, it stops the currect music, cannot play another music without new player.
+  Destroys a specific player, it stops the currect music, in case of player.play, it will create another player.
 
   ```js
   <Player>.destroy()
