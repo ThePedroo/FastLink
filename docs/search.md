@@ -15,7 +15,7 @@
 
   let track = player.search('Rick Astley - Never Gonna Give You Up')
 
-  console.log(track.tracks[0].track)
+  console.log(track.tracks[0].info)
 
 
   // Eris example
@@ -24,7 +24,7 @@
 
   let track = player.search('Rick Astley - Never Gonna Give You Up')
 
-  console.log(track.tracks[0].track)
+  console.log(track.tracks[0].info)
   ```
   
 ## Observation
