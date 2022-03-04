@@ -11,7 +11,7 @@
   ```js
   const player = Lavalink.createPlayer({ guildId: message.guild.id, voiceChannelId: message.member.voice.channel.id }) // Discord.js
   
-  const player = Lavalink.createPlayer({ guildId: message.guild.id, voiceChannelId: message.member.voiceState.channelID }) // Discord.js
+  const player = Lavalink.createPlayer({ guildId: message.guildID, voiceChannelId: message.member.voiceState.channelID }) // Eris
   ```
   
 ## Observation
