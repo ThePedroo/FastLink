@@ -1,6 +1,6 @@
 # Stop
 
-  Stops a player.
+  Stops a specific player.
 
   ```js
   <Player>.stop()
@@ -13,7 +13,7 @@
   
   const player = Lavalink.createPlayer({ guildId: message.guild.id, voiceChannelId: message.member.voice.channel.id })
   
-  let track = player.search('Rick roll')
+  let track = player.search('Rick Astley - Never Gonna Give You Up')
 
   player.play(track.tracks[0].track)
 
@@ -24,7 +24,7 @@
   
   const player = Lavalink.createPlayer({ guildId: message.guildID, voiceChannelId: message.member.voiceState.channelID })
   
-  let track = player.search('Rick roll')
+  let track = player.search('Rick Astley - Never Gonna Give You Up')
 
   player.play(track.tracks[0].track)
 
