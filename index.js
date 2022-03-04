@@ -24,24 +24,24 @@ function connectNode(object, infos, sPayload) {
   nodeInfos.push({
     "Password": object.password,
     "UserId": infos.botId,
-    "Port": object.port ? object.port : 443,
+    "Port": object.port || 443,
     "Queue": infos.handleQueue,
     "Ws": ws
   })
 
   ws.on('open', () => {
     if (infos.debug) console.log('[ FASTLINK ] Node connected')
-    Event.emit('nodeConnected')
+    Event.emit('nodeConnected', (object))
   })
 
-  ws.on('close', () => {
-    if (infos.debug) console.warn(`[ FASTLINK ] Node closed connection unexpectally.`)
-    Event.emit('nodeClose')
+  ws.on('close', (code) => {
+    if (infos.debug) console.warn(`[ FASTLINK ] Node closed connection with code ${code}.`)
+    Event.emit('nodeClose', (object, code))
   })
   
   ws.on('error', (err) => {
     if (infos.debug) console.warn(`[ FASTLINK ] Failed to connect to node.`)
-    Event.emit('nodeError', (err))
+    Event.emit('nodeError', (object, err))
   })
   
   ws.on('message', (data) => {
@@ -59,7 +59,7 @@ function connectNode(object, infos, sPayload) {
       case 'playerUpdate': {
         if (infos.debug) console.log('[ FASTLINK ] playerUpdate object received.')
         delete data['op']
-        Event.emit(data.op, data)
+        Event.emit('playerUpdate', data)
         break
       }
       case 'event': {
@@ -80,24 +80,19 @@ function connectNode(object, infos, sPayload) {
             delete data['type']
             Event.emit('trackStuck', data)
 
-            let queue = map.get('queue') || {}
-
             if (nodeInfos[0].Queue) {
-              if (data.fakeTrack) {
-                let response = sendJson({ op: 'play', guildId: data.guildId, track: data.fakeTrack, noReplace: false, pause: false })
-                if (response?.error == true) throw new Error(response.message)
+              let queue = map.get('queue') || {}
 
-                queue[data.guildId] = []
-                queue[data.guildId].push(data.fakeTrack)
-              } else if(queue[data.guildId] && queue[data.guildId][1]) {
+              if (queue[data.guildId] && queue[data.guildId][1]) {
                 let response = sendJson({ op: 'play', guildId: data.guildId, track: queue[data.guildId][1], noReplace: false, pause: false })
                 if (response?.error == true) throw new Error(response.message)
-              
+
                 queue[data.guildId].shift()
               } else if (queue[data.guildId] && queue[data.guildId][0] && !queue[data.guildId][1]) {              
                 delete queue[data.guildId]
-                map.set('queue', queue)
               }
+
+              map.set('queue', queue)
             }
 
             break
@@ -107,26 +102,26 @@ function connectNode(object, infos, sPayload) {
 
             delete data['op']
             delete data['type']
-            Event.emit('trackEnd', data)
-
-            let queue = map.get('queue') || {}
+            if (!data.fakeTrack) Event.emit('trackEnd', data)
               
             if (nodeInfos[0].Queue) {
-              if (data.fakeTrack) {
-                let response = sendJson({ op: 'play', guildId: data.guildId, track: data.fakeTrack, noReplace: false, pause: false })
+              let queue = map.get('queue') || {}
+
+              if (data.fakeTrack || queue[data.guildId] && queue[data.guildId][1]) {
+                let response = sendJson({ op: 'play', guildId: data.guildId, track: queue[data.guildId] ? queue[data.guildId][1] : data.fakeTrack, noReplace: data.noReplace || false, pause: false })
                 if (response?.error == true) throw new Error(response.message)
 
-                queue[data.guildId] = []
-                queue[data.guildId].push(data.fakeTrack)
-              } else if(queue[data.guildId] && queue[data.guildId][1]) {
-                let response = sendJson({ op: 'play', guildId: data.guildId, track: queue[data.guildId][1], noReplace: false, pause: false })
-                if (response?.error == true) throw new Error(response.message)
-              
-                queue[data.guildId].shift()
+                if (data.fakeTrack) {
+                  queue[data.guildId] = []
+                  queue[data.guildId].push(data.fakeTrack)
+                } else {
+                  queue[data.guildId].shift()
+                }
               } else if (queue[data.guildId] && queue[data.guildId][0] && !queue[data.guildId][1]) {              
                 delete queue[data.guildId]
-                map.set('queue', queue)
               }
+
+              map.set('queue', queue)
             }
 
             break
@@ -137,24 +132,19 @@ function connectNode(object, infos, sPayload) {
             delete data['type']
             Event.emit('trackException', data)
 
-            let queue = map.get('queue') || {}
-
             if (nodeInfos[0].Queue) {
-              if (data.fakeTrack) {
-                let response = sendJson({ op: 'play', guildId: data.guildId, track: data.fakeTrack, noReplace: false, pause: false })
-                if (response?.error == true) throw new Error(response.message)
+              let queue = map.get('queue') || {}
 
-                queue[data.guildId] = []
-                queue[data.guildId].push(data.fakeTrack)
-              } else if(queue[data.guildId] && queue[data.guildId][1]) {
+              if (queue[data.guildId] && queue[data.guildId][1]) {
                 let response = sendJson({ op: 'play', guildId: data.guildId, track: queue[data.guildId][1], noReplace: false, pause: false })
                 if (response?.error == true) throw new Error(response.message)
-              
+
                 queue[data.guildId].shift()
               } else if (queue[data.guildId] && queue[data.guildId][0] && !queue[data.guildId][1]) {              
                 delete queue[data.guildId]
-                map.set('queue', queue)
               }
+
+              map.set('queue', queue)
             }
 
             break
@@ -196,25 +186,25 @@ function handleRaw(data) {
   if (![ 'VOICE_SERVER_UPDATE', 'VOICE_STATE_UPDATE' ].includes(data?.t)) return;
 
   if (data.t == 'VOICE_SERVER_UPDATE') {
-    let sessionIds = map.get('sessionIds')
+    let sessionIds = map.get('sessionIds') || {}
 
-    if (sessionIds[data.d.guild_id.toString()]) {
+    if (sessionIds[data.d.guild_id]) {
       let response = sendJson({
         "op": "voiceUpdate",
-        "guildId": data.d.guild_id.toString(),
-        "sessionId": sessionIds[data.d.guild_id.toString()],
+        "guildId": data.d.guild_id,
+        "sessionId": sessionIds[data.d.guild_id],
         "event": data.d
       })
       if (response?.error == true) throw new Error(response.message)
 
-      delete sessionIds[data.d.guild_id.toString()]
+      delete sessionIds[data.d.guild_id]
       map.set('sessionIds', sessionIds)
     }
   } else {
     if (!data.d.session_id) return;
 
     let sessionIds = map.get('sessionIds') || {}
-    sessionIds[data.d.guild_id.toString()] = data.d.session_id.toString()
+    sessionIds[data.d.guild_id] = data.d.session_id
 
     if (data.d.member.user.id == nodeInfos[0].UserId) map.set('sessionIds', sessionIds)
   }
@@ -245,27 +235,47 @@ class PlayerFunctions {
     if (typeof track != 'string') throw new Error('track field must be a string.')
 
     let players = map.get('players') || {}
-    let queue = map.get('queue') || {}
       
     players[this.config.guildId] = { voiceChannelId: this.config.voiceChannelId, playing: true, track, paused: false }
 
+    map.set('players', players)
+
     if (nodeInfos[0].Queue) {
+      let queue = map.get('queue') || {}
+
       if (queue[this.config.guildId] && queue[this.config.guildId][0]) {
         queue[this.config.guildId].push(track)
+        map.set('queue', queue)
       } else {
-        nodeInfos[0].Ws.emit('message', JSON.stringify({ op: 'event', type: 'TrackEndEvent', guildId: this.config.guildId.toString(), fakeTrack: track }))    
+        nodeInfos[0].Ws.emit('message', JSON.stringify({ op: 'event', type: 'TrackEndEvent', guildId: this.config.guildId, fakeTrack: track, noReplace }))    
       }
     } else {
       let response = sendJson({ op: 'play', guildId: this.config.guildId, track: track, noReplace: false, pause: false })
       if (response?.error == true) throw new Error(response.message)
     }
+  }
+  playNext() {
+    if (!nodeInfos[0].Queue) return;
+
+    let guildQueue = map.get('queue') || {}
     
-    map.set('queue', queue)
-    map.set('players', players)
+    if (guildQueue[this.config.guildId]) {
+      let players = map.get('players') || {}
+      guildQueue[this.config.guildId].shift()
+
+      players[this.config.guildId] = { voiceChannelId: this.config.voiceChannelId, playing: true, track: guildQueue[this.config.guildId], paused: false }
+
+      let response = sendJson({ op: 'play', guildId: this.config.guildId, track: guildQueue[this.config.guildId], noReplace: false, pause: false })
+      if (response?.error == true) throw new Error(response.message)
+
+      map.set('queue', guildQueue)
+      map.set('players', players)
+    }
   }
   search(music) {
     if (!/^https?:\/\//.test(music)) music = `ytsearch:${music}`
     if (/^https?:\/\/(?:soundcloud\.com|snd\.sc)(?:\/\w+(?:-\w+)*)+$/.test(music)) music = `sc:${music}`
+
     return makeRequest(`${nodeInfos[0].Ws._url.startsWith('ws:') ? 'http' : 'https'}://${nodeInfos[0].Ws._socket._host}/loadtracks?identifier=${encodeURIComponent(music)}`, {
       header: { 'Authorization': nodeInfos[0].Password },
       port: nodeInfos[0].Port,
@@ -277,7 +287,8 @@ class PlayerFunctions {
     if (response?.error == true) throw new Error(response.message)
 
     let players = map.get('players') || {}
-    delete players[this.config.guildId.toString()]
+
+    delete players[this.config.guildId]
     map.set('players', players)
   }
   destroy() {
@@ -285,7 +296,8 @@ class PlayerFunctions {
     if (response?.error == true) throw new Error(response.message)
 
     let players = map.get('players') || {}
-    delete players[this.config.guildId.toString()]
+
+    delete players[this.config.guildId]
     map.set('players', players)
   }
   setVolume(volume) {
@@ -298,7 +310,7 @@ class PlayerFunctions {
     if (typeof pause != 'boolean') throw new Error('pause field must be a boolean.')
 
     let players = map.get('players') || {}
-    players[this.config.guildId.toString()] = { voiceChannelId: this.config.voiceChannelId, playing: pause == true ? false : true, track: players[this.config.guildId.toString()].track, paused: pause }
+    players[this.config.guildId] = { voiceChannelId: this.config.voiceChannelId, playing: pause == true ? false : true, track: players[this.config.guildId].track, paused: pause }
     map.set('players', players)
 
     let response = sendJson({ op: 'pause', guildId: this.config.guildId, pause })
@@ -312,7 +324,8 @@ function createPlayer(config) {
   if (typeof config.voiceChannelId != 'string' && typeof config.voiceChannelId != 'number') throw new Error('voiceChannelId field must be a string or a number.')
 
   let players = map.get('players') || {}
-  players[config.guildId.toString()] = { voiceChannelId: config.voiceChannelId, playing: false, track: null, paused: false }
+
+  players[config.guildId] = { voiceChannelId: config.voiceChannelId, playing: false, track: null, paused: false }
   map.set('players', players)
 
   return (new PlayerFunctions(config))
@@ -321,29 +334,65 @@ function createPlayer(config) {
 function getPlayer(guildId) {
   if (typeof guildId != 'string' && typeof guildId != 'number') throw new Error('guildId field must be a string or a number.')
 
-  let guildPlayer = map.get('players')
+  let guildPlayer = map.get('players') || {}
   
-  if (guildPlayer && guildPlayer[guildId]) {
+  if (guildPlayer[guildId]) {
     return (new PlayerFunctions({ guildId, voiceChannelId: guildPlayer[guildId].voiceChannelId }))
   }
 }
 
-function getAllPlayers() {
-  return map.get('players')
-}
-
 function getQueue(guildId) {
+  if (!nodeInfos[0].Queue) return;
   if (typeof guildId != 'string' && typeof guildId != 'number') throw new Error('guildId field must be a string or a number.')
 
-  let guildQueue = map.get('queue')
+  let guildQueue = map.get('queue') || {}
   
-  if (guildQueue && guildQueue[guildId]) {
-    return guildQueue[guildId]
-  }
+  if (guildQueue[guildId]) return guildQueue[guildId]
+  return guildQueue
+}
+
+function getAllPlayers() {
+  return map.get('players') || {}
 }
 
 function getAllQueues() {
-  return map.get('queue')
+  if (!nodeInfos[0].Queue) return;
+  return map.get('queue') || {}
 }
 
-export default { connectNode, handleRaw, getLavalinkEvents, createPlayer, getPlayer, getAllPlayers, getQueue, getAllQueues }
+function decodeTrack(track) {
+  if (typeof track != 'string') throw new Error('track field must be a string.')
+
+  return makeRequest(`${nodeInfos[0].Ws._url.startsWith('ws:') ? 'http' : 'https'}://${nodeInfos[0].Ws._socket._host}/decodetrack?track=${encodeURIComponent(track)}`, {
+    header: { 'Authorization': nodeInfos[0].Password },
+    port: nodeInfos[0].Port,
+    method: 'GET'
+  })
+}
+
+function removeQueueTrack(guildId, position) {
+  if (!nodeInfos[0].Queue) return;
+  if (typeof guildId != 'string' && typeof guildId != 'number') throw new Error('guildId field must be a string or a number.')
+  if (typeof guildId != 'string' && typeof guildId != 'number') throw new Error('number field must be a string or a number.')
+
+  let guildQueue = map.get('queue') || {}
+
+  if (guildQueue[guildId] && guildQueue[guildId].length != 0) {
+    guildQueue[guildId][Number(position)] = null
+    guildQueue[guildId].filter((x) => x != null)
+    map.set('queue', guildQueue)
+  }
+}
+
+export default { 
+  connectNode,
+  handleRaw,
+  getLavalinkEvents,
+  createPlayer,
+  getPlayer,
+  getQueue,
+  getAllPlayers,
+  getAllQueues,
+  decodeTrack,
+  removeQueueTrack
+}
