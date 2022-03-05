@@ -1,7 +1,7 @@
 FastLink <a href="https://discord.gg/ut6qxsgtME"><img src="https://img.shields.io/discord/948014684630560768?color=5865F2&logo=discord&logoColor=white" alt="Discord server"/></a>
 ====
 
-An lightweight, memory-efficient Lavalink wrapper using Node.js.
+A lightweight, memory-efficient Lavalink wrapper using Node.js.
 
 # Documentation
 
