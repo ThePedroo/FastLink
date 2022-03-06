@@ -15,13 +15,13 @@
   events.on('trackEnd', (track) => console.log('Track ended'))
   ```
 
-## Observation
+## Observations
 
   This function can emit several events, like: 
   
   ```text
-  Node: nodeConnect, nodeClose, nodeError.
-  Status: raw, stats, playerUpdate.
-  Events: trackStart, TrackStuck, TrackEnd, TrackException, WebSocketClosed.
-  Unknown: unknownType, unknownOp.
+   -  Node: nodeConnect, nodeClose, nodeError.
+   -  Status: raw, stats, playerUpdate.
+   -  Events: trackStart, TrackStuck, TrackEnd, TrackException, WebSocketClosed.
+   -  Unknown: unknownType, unknownOp.
   ```
