@@ -1,6 +1,6 @@
 # Get all Queues
 
-  Get all queues with musics.
+  Get all server queues with musics.
 
   ```js
   getAllQueues()
