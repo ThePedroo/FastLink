@@ -17,6 +17,7 @@
 
   queue.forEach((x) => console.log(x))
   
+  
   // Eris example
   
   const player = Lavalink.getPlayer(message.guildID)
