@@ -42,6 +42,6 @@
   }, 5000)
   ```
   
-## Observation
+## Observations
 
   This is a function from the [createPlayer](docs/createPlayer.md)/[getPlayer](docs/getPlayer.md) functions. You **will** need one of them for use this function.
