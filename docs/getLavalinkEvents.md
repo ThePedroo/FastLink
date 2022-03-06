@@ -1,6 +1,6 @@
 # Get Lavalink Events
 
-  Get the events sent by the Lavalink.
+  Get all events sent by the Lavalink.
 
   ```js
   getLavalinkEvents()
