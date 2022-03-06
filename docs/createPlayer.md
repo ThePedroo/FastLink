@@ -14,6 +14,6 @@
   const player = Lavalink.createPlayer({ guildId: message.guildID, voiceChannelId: message.member.voiceState.channelID }) // Eris
   ```
   
-## Observation
+## Observations
 
   You will need this function for use the connect, play, search, stop, destroy, setVolume and setPaused functions. They are necessary for the bot to play a music.
