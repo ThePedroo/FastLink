@@ -14,6 +14,6 @@
   queues.forEach((x) => console.log(x))
   ```
   
-## Observation
+## Observations
 
   This function can return {} if the option for the FastLink handle the Queue it's not set for true. See [connectNode](docs/connectNode.md) options for enable it.
