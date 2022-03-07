@@ -16,4 +16,4 @@
   
 ## Observations
 
-  You will need this function for use the [connect](docs/connect.md), [getQueue](docs/getQueue.md), [play](docs/play.md), [search](docs/search.md), [stop](docs/stop.md), [destroy](docs/destroy.md), [setVolume](docs/setVolume.md) and [setPaused](docs/setPaused.md) functions. They are necessary for the bot to play a music.
+  You will need this function for use the [connect](docs/connect.md), [getQueue](docs/getQueue.md), [play](docs/play.md), [playPlaylist](docs/playPlaylist.md), [search](docs/search.md), [stop](docs/stop.md), [destroy](docs/destroy.md), [setVolume](docs/setVolume.md) and [setPaused](docs/setPaused.md) functions. They are necessary for the bot to play a music.
