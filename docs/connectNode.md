@@ -15,6 +15,7 @@
     client.guilds.cache.get(guildId).shard.send(payload)
   })
 
+
   // Eris example
 
   Lavalink.connectNode([{ host: 'example.com', secure: true, password: 'youshallnotpass', port: undefined }], { market: 'US', shards: 1, botId: '1234567891011121314' }, (guildId, payload) => {
