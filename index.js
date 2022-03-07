@@ -24,7 +24,7 @@ function connectNode(object, infos, sPayload) {
       Authorization: object.password,
       'Num-Shards': infos.shards,
       'User-Id': infos.botId,
-      'Client-Name': 'Fastlink@1.1.5'
+      'Client-Name': 'Fastlink@1.1.7'
     }
   })
 
@@ -92,8 +92,6 @@ function connectNode(object, infos, sPayload) {
             delete data['type']
             if (!data.reason == 'FAKE_TRACK_END') Event.emit('trackEnd', data)
               
-            console.log(data)
-              
             if (nodeInfos[0].Queue) {
               let queue = map.get('queue') || {}
               let players = map.get('players') || {}
@@ -104,11 +102,8 @@ function connectNode(object, infos, sPayload) {
                   if (response?.error == true) throw new Error(response.message)
 
                   if (data.reason.startsWith('FAKE_TRACK_END') && data.reason != 'FAKE_TRACK_END_SKIP') {
-                    if (queue[data.guildId] && queue[data.guildId].length != 0) {
-                      queue[data.guildId].push(data.track)
-                    } else {
-                      queue[data.guildId] = []
-                    }
+                    if (!queue[data.guildId]) queue[data.guildId] = []
+                    queue[data.guildId].push(data.track)
                   } else {
                     queue[data.guildId].shift()
                   }
