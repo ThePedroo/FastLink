@@ -24,7 +24,7 @@ function connectNode(object, infos, sPayload) {
       Authorization: object.password,
       'Num-Shards': infos.shards,
       'User-Id': infos.botId,
-      'Client-Name': 'Fastlink@1.1.8'
+      'Client-Name': 'Fastlink@1.1.9'
     }
   })
 
@@ -396,7 +396,7 @@ class PlayerFunctions {
                   return;
                 }
                 
-                response.tracks.push({ track: res.tracks[0].track, info: { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, length: x2.track.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.images[0].url, position: x2.track.position, title: x2.track.name, uri: x2.track.external_urls.spotify, sourceName: 'spotify' } })
+                response.tracks.push({ track: res.tracks[0].track, info: { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, author: x.track.artists.map(artist => artist.name).join(', '), length: x2.track.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.images[0].url, position: x2.track.position, title: x2.track.name, uri: x2.track.external_urls.spotify, sourceName: 'spotify' } })
 
                 if (response.tracks.length == x.tracks.items.length) {
                   response.tracks.sort((a, b) => a.info.position - b.info.position)
@@ -426,7 +426,7 @@ class PlayerFunctions {
                   return;
                 }
                 
-                response.tracks.push({ track: res.tracks[0].track, info: { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, length: x2.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.images[0].url, position: x2.position, title: x2.name, uri: x2.external_urls.spotify, sourceName: 'spotify' } })
+                response.tracks.push({ track: res.tracks[0].track, info: { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, author: x.artists.map(artist => artist.name).join(', '), length: x2.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.images[0].url, position: x2.position, title: x2.name, uri: x2.external_urls.spotify, sourceName: 'spotify' } })
                 if (response.tracks.length == x.tracks.items.length) {
                   response.tracks.sort((a, b) => a.info.position - b.info.position)
                   resolve(response)

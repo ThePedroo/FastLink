@@ -1,6 +1,6 @@
 {
   "name": "fastlink",
-  "version": "1.1.8",
+  "version": "1.1.9",
   "description": "A lightweight, memory-efficient Lavalink wrapper using Node.js.",
   "main": "index.js",
   "type": "module",

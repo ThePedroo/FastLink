@@ -5,7 +5,7 @@ function makeRequest(url, options) {
   return new Promise((resolve) => {
     let req, data = ''
     
-    options.headers['User-Agent'] = 'FastLink@1.1.8'
+    options.headers['User-Agent'] = 'FastLink@1.1.9'
 
     if (url.startsWith('https://')) {
       req = https.request(url, { port: options.port, method: options.method, headers: options.headers }, (res) => {
