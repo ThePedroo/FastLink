@@ -6,27 +6,39 @@ import events from 'events'
 const Event = new events()
 const map = new Map()
 
+const tokens = {}
 const nodeInfos = []
 
 let sendPayload;
 
 function connectNode(object, infos, sPayload) {
+  if (!object || !infos || typeof object != 'object' || typeof infos != 'object') throw new Error(`${object == undefined || typeof object == 'object' ? 'first parameter' : infos == undefined || typeof infos == 'object' ? 'second parameter' : ''} must be an object.`)
+
+  if (typeof infos.shards != 'number') throw new Error('shards field must be a number')
+  if (typeof infos.botId != 'string' && infos.botId != 'number') throw new Error('botId field must be a string or a number.')
+
   sendPayload = sPayload
+
   let ws = new WebSocket(`${object.secure ? 'wss://' : 'ws://'}${object.host}${object.port != undefined ? `:${object.port}` : ''}`, undefined, {
     headers: {
       Authorization: object.password,
-      "Num-Shards": infos.shards,
-      "User-Id": infos.botId,
-      "Client-Name": "Fastlink"
+      'Num-Shards': infos.shards,
+      'User-Id': infos.botId,
+      'Client-Name': 'Fastlink@1.1.5'
     }
   })
 
   nodeInfos.push({
-    "Password": object.password,
-    "UserId": infos.botId,
-    "Port": object.port || 443,
-    "Queue": infos.handleQueue,
-    "Ws": ws
+    'SpotifyMarket': infos.market,
+    'Password': object.password,
+    'UserId': infos.botId,
+    'Port': object.port || 443,
+    'Queue': infos.handleQueue,
+    'Ws': ws
+  })
+
+  makeRequest('https://open.spotify.com/get_access_token', { headers: {}, port: 443, method: 'GET' }).then((spotify) => {
+    tokens['Spotify'] = spotify.accessToken
   })
 
   ws.on('open', () => {
@@ -40,7 +52,7 @@ function connectNode(object, infos, sPayload) {
   })
   
   ws.on('error', (err) => {
-    if (infos.debug) console.warn(`[ FASTLINK ] Failed to connect to node.`)
+    if (infos.debug) console.warn(`[ FASTLINK ] Failed to connect to node, Error: ${err}`)
     Event.emit('nodeError', (object, err))
   })
   
@@ -73,55 +85,40 @@ function connectNode(object, infos, sPayload) {
 
             break
           }
-          case 'TrackStuckEvent': {
-            if (infos.debug) console.log('[ FASTLINK ] trackStuck object received.')
-
-            delete data['op']
-            delete data['type']
-            Event.emit('trackStuck', data)
-
-            if (nodeInfos[0].Queue) {
-              let queue = map.get('queue') || {}
-
-              if (queue[data.guildId] && queue[data.guildId][1]) {
-                let response = sendJson({ op: 'play', guildId: data.guildId, track: queue[data.guildId][1], noReplace: false, pause: false })
-                if (response?.error == true) throw new Error(response.message)
-
-                queue[data.guildId].shift()
-              } else if (queue[data.guildId] && queue[data.guildId][0] && !queue[data.guildId][1]) {              
-                delete queue[data.guildId]
-              }
-
-              map.set('queue', queue)
-            }
-
-            break
-          }
           case 'TrackEndEvent': {
             if (infos.debug) console.log('[ FASTLINK ] trackEnd object received.')
 
             delete data['op']
             delete data['type']
-            if (!data.fakeTrack) Event.emit('trackEnd', data)
+            if (!data.reason == 'FAKE_TRACK_END') Event.emit('trackEnd', data)
+              
+            console.log(data)
               
             if (nodeInfos[0].Queue) {
               let queue = map.get('queue') || {}
+              let players = map.get('players') || {}
 
-              if (data.fakeTrack || queue[data.guildId] && queue[data.guildId][1]) {
-                let response = sendJson({ op: 'play', guildId: data.guildId, track: queue[data.guildId] ? queue[data.guildId][1] : data.fakeTrack, noReplace: data.noReplace || false, pause: false })
-                if (response?.error == true) throw new Error(response.message)
+              if (data.reason != 'REPLACED') {
+                if (data.reason.startsWith('FAKE_TRACK_END') || queue[data.guildId] && queue[data.guildId][1]) {     
+                  let response = sendJson({ op: 'play', guildId: data.guildId, track: data.track && data.reason.startsWith('FAKE_TRACK_END') ? data.track : queue[data.guildId][1], noReplace: data.noReplace != undefined ? data.noReplace : false, pause: false })
+                  if (response?.error == true) throw new Error(response.message)
 
-                if (data.fakeTrack) {
-                  queue[data.guildId] = []
-                  queue[data.guildId].push(data.fakeTrack)
-                } else {
-                  queue[data.guildId].shift()
+                  if (data.reason.startsWith('FAKE_TRACK_END') && data.reason != 'FAKE_TRACK_END_SKIP') {
+                    if (queue[data.guildId] && queue[data.guildId].length != 0) {
+                      queue[data.guildId].push(data.track)
+                    } else {
+                      queue[data.guildId] = []
+                    }
+                  } else {
+                    queue[data.guildId].shift()
+                  }
+                  players[data.guildId]['track'] = queue[data.guildId][0]
+                } else if (queue[data.guildId] && queue[data.guildId][0] && !queue[data.guildId][1] && data.reason != 'REPLACED') {         
+                  delete queue[data.guildId]
                 }
-              } else if (queue[data.guildId] && queue[data.guildId][0] && !queue[data.guildId][1]) {              
-                delete queue[data.guildId]
-              }
 
-              map.set('queue', queue)
+                map.set('queue', queue)
+              }
             }
 
             break
@@ -134,12 +131,42 @@ function connectNode(object, infos, sPayload) {
 
             if (nodeInfos[0].Queue) {
               let queue = map.get('queue') || {}
+              let players = map.get('players') || {}
 
               if (queue[data.guildId] && queue[data.guildId][1]) {
                 let response = sendJson({ op: 'play', guildId: data.guildId, track: queue[data.guildId][1], noReplace: false, pause: false })
                 if (response?.error == true) throw new Error(response.message)
 
                 queue[data.guildId].shift()
+                  
+                players[data.guildId]['track'] = queue[data.guildId][0]
+              } else if (queue[data.guildId] && queue[data.guildId][0] && !queue[data.guildId][1]) {              
+                delete queue[data.guildId]
+              }
+
+              map.set('queue', queue)
+            }
+
+            break
+          }
+          case 'TrackStuckEvent': {
+            if (infos.debug) console.log('[ FASTLINK ] trackStuck object received.')
+
+            delete data['op']
+            delete data['type']
+            Event.emit('trackStuck', data)
+
+            if (nodeInfos[0].Queue) {
+              let queue = map.get('queue') || {}
+              let players = map.get('players') || {}
+
+              if (queue[data.guildId] && queue[data.guildId][1]) {
+                let response = sendJson({ op: 'play', guildId: data.guildId, track: queue[data.guildId][1], noReplace: false, pause: false })
+                if (response?.error == true) throw new Error(response.message)
+
+                queue[data.guildId].shift()
+                
+                players[data.guildId]['track'] = queue[data.guildId][0]
               } else if (queue[data.guildId] && queue[data.guildId][0] && !queue[data.guildId][1]) {              
                 delete queue[data.guildId]
               }
@@ -159,14 +186,14 @@ function connectNode(object, infos, sPayload) {
             break
           }
           default: {
-            if (infos.debug) console.log(`[ FASTLINK ] unknown type [${data.type}] received.`)
+            if (infos.debug) console.log(`[ FASTLINK ] unknown type [${data.type || 'No type specified'}] received.`)
             Event.emit('unknownType', data)
           }
         }
         break
       }
       default: {
-        if (infos.debug) console.log(`[ FASTLINK ] unknown op [${data.op}] received.`)
+        if (infos.debug) console.log(`[ FASTLINK ] unknown op [${data.op || 'No op received'}] received.`)
         Event.emit('unknownOp', data)
       }
     }
@@ -182,6 +209,32 @@ function sendJson(json) {
   return response
 }
 
+function makeSpotifyRequest(endpoint) {
+  return new Promise((resolve) => {
+    makeRequest(`https://api.spotify.com/v1${endpoint}`, {
+      headers: { 'Authorization': `Bearer ${tokens.Spotify}` },
+      port: 443,
+      method: 'GET'
+    }).then((res) => {
+      if (res?.error?.status == 401) {
+        makeRequest('https://open.spotify.com/get_access_token', { headers: {}, port: 443, method: 'GET' }).then((spotify) => {
+          tokens['Spotify'] = spotify.accessToken
+
+          makeRequest(`https://api.spotify.com/v1${endpoint}`, {
+            headers: { 'Authorization': `Bearer ${tokens.Spotify}` },
+            port: 443,
+            method: 'GET'
+          }).then((res) => {
+            return resolve(res)
+          })
+        })
+      }
+
+      return resolve(res)
+    })
+  })
+}
+
 function handleRaw(data) {
   if (![ 'VOICE_SERVER_UPDATE', 'VOICE_STATE_UPDATE' ].includes(data?.t)) return;
 
@@ -190,10 +243,10 @@ function handleRaw(data) {
 
     if (sessionIds[data.d.guild_id]) {
       let response = sendJson({
-        "op": "voiceUpdate",
-        "guildId": data.d.guild_id,
-        "sessionId": sessionIds[data.d.guild_id],
-        "event": data.d
+        'op': 'voiceUpdate',
+        'guildId': data.d.guild_id,
+        'sessionId': sessionIds[data.d.guild_id],
+        'event': data.d
       })
       if (response?.error == true) throw new Error(response.message)
 
@@ -229,15 +282,15 @@ class PlayerFunctions {
           self_mute: mute,
           self_deaf: deaf
         }
-    }))
+      })
+    )
   }
   play(track, noReplace = false) {
     if (typeof track != 'string') throw new Error('track field must be a string.')
 
     let players = map.get('players') || {}
-      
-    players[this.config.guildId] = { voiceChannelId: this.config.voiceChannelId, playing: true, track, paused: false }
 
+    players[this.config.guildId] = { voiceChannelId: this.config.voiceChannelId, playing: true, track, paused: false }
     map.set('players', players)
 
     if (nodeInfos[0].Queue) {
@@ -247,39 +300,158 @@ class PlayerFunctions {
         queue[this.config.guildId].push(track)
         map.set('queue', queue)
       } else {
-        nodeInfos[0].Ws.emit('message', JSON.stringify({ op: 'event', type: 'TrackEndEvent', guildId: this.config.guildId, fakeTrack: track, noReplace }))    
+        nodeInfos[0].Ws.emit('message', JSON.stringify({ op: 'event', type: 'TrackEndEvent', guildId: this.config.guildId, reason: 'FAKE_TRACK_END', track: track, noReplace }))
       }
     } else {
       let response = sendJson({ op: 'play', guildId: this.config.guildId, track: track, noReplace: false, pause: false })
       if (response?.error == true) throw new Error(response.message)
     }
   }
-  playNext() {
+  playPlaylist(track) {
+    if (nodeInfos[0].Queue) {
+      let queue = map.get('queue') || {}
+      let players = map.get('players') || {}
+     
+      if (!queue[this.config.guildId]) queue[this.config.guildId] = []
+        
+      if (queue[this.config.guildId][0]) {
+        track.tracks.forEach((x) => queue[this.config.guildId].push(x.track))
+      } else {
+        track.tracks.forEach((x) => queue[this.config.guildId].push(x.track))
+        
+        let response = sendJson({ op: 'play', guildId: this.config.guildId, track: queue[this.config.guildId][0], noReplace: false, pause: false })
+        if (response?.error == true) throw new Error(response.message)
+      
+        players[this.config.guildId] = { voiceChannelId: this.config.voiceChannelId, playing: true, track, paused: false }
+        map.set('players', players)
+        
+        queue[this.config.guildId].shift()
+      }
+      
+      map.set('queue', queue)
+    }
+  }
+  skip() {
     if (!nodeInfos[0].Queue) return;
 
     let guildQueue = map.get('queue') || {}
-    
-    if (guildQueue[this.config.guildId]) {
-      let players = map.get('players') || {}
-      guildQueue[this.config.guildId].shift()
 
-      players[this.config.guildId] = { voiceChannelId: this.config.voiceChannelId, playing: true, track: guildQueue[this.config.guildId], paused: false }
-
-      let response = sendJson({ op: 'play', guildId: this.config.guildId, track: guildQueue[this.config.guildId], noReplace: false, pause: false })
-      if (response?.error == true) throw new Error(response.message)
-
-      map.set('queue', guildQueue)
-      map.set('players', players)
+    if (guildQueue[this.config.guildId] && guildQueue[this.config.guildId][1]) {
+      nodeInfos[0].Ws.emit('message', JSON.stringify({ op: 'event', type: 'TrackEndEvent', guildId: this.config.guildId, reason: 'FAKE_TRACK_END_SKIP', track: guildQueue[this.config.guildId][0] }))
     }
   }
   search(music) {
     if (!/^https?:\/\//.test(music)) music = `ytsearch:${music}`
     if (/^https?:\/\/(?:soundcloud\.com|snd\.sc)(?:\/\w+(?:-\w+)*)+$/.test(music)) music = `sc:${music}`
+      
+    return new Promise((resolve) => {
+      let spotifyRegex = /(?:https:\/\/open\.spotify\.com\/|spotify:)(?:.+)?(track|playlist|artist|episode|show|album)[/:]([A-Za-z0-9]+)/
+      if (spotifyRegex.test(music)) {
+        let track = spotifyRegex.exec(music)
+        let end = `/tracks/${track[2]}`
+        if (track[1] == 'playlist') end = `/playlists/${track[2]}`
+        if (track[1] == 'album') end = `/albums/${track[2]}`
+        if (track[1] == 'episode') end = `/episodes/${track[2]}?market=${nodeInfos[0].SpotifyMarket}`
 
-    return makeRequest(`${nodeInfos[0].Ws._url.startsWith('ws:') ? 'http' : 'https'}://${nodeInfos[0].Ws._socket._host}/loadtracks?identifier=${encodeURIComponent(music)}`, {
-      header: { 'Authorization': nodeInfos[0].Password },
-      port: nodeInfos[0].Port,
-      method: 'GET'
+        makeSpotifyRequest(end).then(async (x) => {
+
+          if (track[1] == 'track') {
+            if (x?.error?.status == 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
+            makeRequest(`${nodeInfos[0].Ws._url.startsWith('ws:') ? 'http' : 'https'}://${nodeInfos[0].Ws._socket._host}/loadtracks?identifier=ytsearch:${encodeURIComponent(`${x.name} ${x.artists[0].name}`)}`, {
+              headers: { 'Authorization': nodeInfos[0].Password },
+              port: nodeInfos[0].Port,
+              method: 'GET'
+            }).then((res) => {
+              if (res.loadType != 'SEARCH_RESULT') return resolve(res)
+            
+              resolve({ loadType: 'SEARCH_RESULT', playlistInfo: {}, tracks: [{ track: res.tracks[0].track, info: { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, length: x.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.album.images[0].url, position: 0, title: x.name, uri: x.external_urls.spotify, sourceName: 'spotify' } }] })
+            })
+          } if (track[1] == 'episode') {
+            if (x?.error?.status == 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
+            makeRequest(`${nodeInfos[0].Ws._url.startsWith('ws:') ? 'http' : 'https'}://${nodeInfos[0].Ws._socket._host}/loadtracks?identifier=ytsearch:${encodeURIComponent(x.name)}`, {
+              headers: { 'Authorization': nodeInfos[0].Password },
+              port: nodeInfos[0].Port,
+              method: 'GET'
+            }).then((res) => {
+              if (res.loadType != 'SEARCH_RESULT') return resolve(res)
+            
+              resolve({ loadType: 'SEARCH_RESULT', playlistInfo: {}, tracks: [{ track: res.tracks[0].track, info: { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, length: x.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.images[0].url, position: 0, title: x.name, uri: x.external_urls.spotify, sourceName: 'spotify' } }] })
+            })
+          } else {
+            if (track[1] == 'playlist') {
+              if (x?.error?.status == 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
+              
+              let i = 0
+              let response = { loadType: 'PLAYLIST_LOADED', playlistInfo: { selectedTrack: 0, name: x.name }, tracks: [] }
+              x.tracks.items.forEach(async (x2) => {
+                x2.track['position'] = i
+                i++
+                
+                let res = await makeRequest(`${nodeInfos[0].Ws._url.startsWith('ws:') ? 'http' : 'https'}://${nodeInfos[0].Ws._socket._host}/loadtracks?identifier=ytsearch:${encodeURIComponent(`${x2.track.name} ${x2.track.artists[0].name}`)}`, {
+                  headers: { 'Authorization': nodeInfos[0].Password },
+                  port: nodeInfos[0].Port,
+                  method: 'GET'
+                })
+              
+                if (res.loadType != 'SEARCH_RESULT') {
+                  if (response.tracks.length == x.tracks.items.length) {
+                    response.tracks.sort((a, b) => a.info.position - b.info.position)
+                    resolve(response)
+                  }
+                  return;
+                }
+                
+                response.tracks.push({ track: res.tracks[0].track, info: { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, length: x2.track.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.images[0].url, position: x2.track.position, title: x2.track.name, uri: x2.track.external_urls.spotify, sourceName: 'spotify' } })
+
+                if (response.tracks.length == x.tracks.items.length) {
+                  response.tracks.sort((a, b) => a.info.position - b.info.position)
+                  resolve(response)
+                }
+              })
+            } else if (track[1] == 'album') {
+              if (x?.error?.status == 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
+              
+              let i = 0
+              let response = { loadType: 'PLAYLIST_LOADED', playlistInfo: { selectedTrack: 0, name: x.name }, tracks: [] }
+              x.tracks.items.forEach(async (x2) => {
+                x2['position'] = i
+                i++
+                
+                let res = await makeRequest(`${nodeInfos[0].Ws._url.startsWith('ws:') ? 'http' : 'https'}://${nodeInfos[0].Ws._socket._host}/loadtracks?identifier=ytsearch:${encodeURIComponent(`${x2.name} ${x2.artists[0].name}`)}`, {
+                  headers: { 'Authorization': nodeInfos[0].Password },
+                  port: nodeInfos[0].Port,
+                  method: 'GET'
+                })
+              
+                if (res.loadType != 'SEARCH_RESULT') {
+                  if (response.tracks.length == x.tracks.items.length) {
+                    response.tracks.sort((a, b) => a.info.position - b.info.position)
+                    resolve(response)
+                  }
+                  return;
+                }
+                
+                response.tracks.push({ track: res.tracks[0].track, info: { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, length: x2.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.images[0].url, position: x2.position, title: x2.name, uri: x2.external_urls.spotify, sourceName: 'spotify' } })
+                if (response.tracks.length == x.tracks.items.length) {
+                  response.tracks.sort((a, b) => a.info.position - b.info.position)
+                  resolve(response)
+                }
+              })
+            }
+          }
+        })
+      } else {
+        makeRequest(`${nodeInfos[0].Ws._url.startsWith('ws:') ? 'http' : 'https'}://${nodeInfos[0].Ws._socket._host}/loadtracks?identifier=${encodeURIComponent(music)}`, {
+          headers: { 'Authorization': nodeInfos[0].Password },
+          port: nodeInfos[0].Port,
+          method: 'GET'
+        }).then((res) => {
+          res.tracks.forEach((x) => {
+            x.info['artwork'] = `https://i.ytimg.com/vi/${x.info.identifier}/maxresdefault.jpg`
+          })
+          resolve(res)
+        })
+      }
     })
   }
   stop() {
@@ -316,6 +488,34 @@ class PlayerFunctions {
     let response = sendJson({ op: 'pause', guildId: this.config.guildId, pause })
     if (response?.error == true) throw new Error(response.message)
   }
+  removeTrack(position) {
+    if (!nodeInfos[0].Queue) return;
+    if (typeof position != 'string' && typeof position != 'number') throw new Error('position field must be a string or a number.')
+  
+    let guildQueue = map.get('queue') || {}
+  
+    if (guildQueue[this.config.guildId] && guildQueue[this.config.guildId].length != 0) {
+      if (position == 0) {
+        if (!guildQueue[this.config.guild][1]) throw new Error('Queue is empyt, cannot remove track.')
+        nodeInfos[0].Ws.emit('message', JSON.stringify({ op: 'event', type: 'TrackEndEvent', guildId: this.config.guildId, reason: 'FAKE_TRACK_END_SKIP', track: guildQueue[this.config.guildId][0] }))
+      }
+    } else {
+      if (!guildQueue[this.config.guild][Number(position)]) throw new Error('There is no track with this position, cannot remove track.')
+          
+      guildQueue[this.config.guildId][Number(position)] = null
+      guildQueue[this.config.guildId] = guildQueue[this.config.guildId].filter((x) => x != null)
+  
+      map.set('queue', guildQueue)
+    }
+  }
+  getQueue() {
+    if (!nodeInfos[0].Queue) return;
+  
+    let guildQueue = map.get('queue') || {}
+    
+    if (guildQueue[this.config.guildId]) return guildQueue[this.config.guildId]
+    return guildQueue
+  }
 }
 
 function createPlayer(config) {
@@ -341,16 +541,6 @@ function getPlayer(guildId) {
   }
 }
 
-function getQueue(guildId) {
-  if (!nodeInfos[0].Queue) return;
-  if (typeof guildId != 'string' && typeof guildId != 'number') throw new Error('guildId field must be a string or a number.')
-
-  let guildQueue = map.get('queue') || {}
-  
-  if (guildQueue[guildId]) return guildQueue[guildId]
-  return guildQueue
-}
-
 function getAllPlayers() {
   return map.get('players') || {}
 }
@@ -364,24 +554,10 @@ function decodeTrack(track) {
   if (typeof track != 'string') throw new Error('track field must be a string.')
 
   return makeRequest(`${nodeInfos[0].Ws._url.startsWith('ws:') ? 'http' : 'https'}://${nodeInfos[0].Ws._socket._host}/decodetrack?track=${encodeURIComponent(track)}`, {
-    header: { 'Authorization': nodeInfos[0].Password },
+    headers: { 'Authorization': nodeInfos[0].Password },
     port: nodeInfos[0].Port,
     method: 'GET'
   })
-}
-
-function removeQueueTrack(guildId, position) {
-  if (!nodeInfos[0].Queue) return;
-  if (typeof guildId != 'string' && typeof guildId != 'number') throw new Error('guildId field must be a string or a number.')
-  if (typeof guildId != 'string' && typeof guildId != 'number') throw new Error('number field must be a string or a number.')
-
-  let guildQueue = map.get('queue') || {}
-
-  if (guildQueue[guildId] && guildQueue[guildId].length != 0) {
-    guildQueue[guildId][Number(position)] = null
-    guildQueue[guildId].filter((x) => x != null)
-    map.set('queue', guildQueue)
-  }
 }
 
 export default { 
@@ -390,9 +566,7 @@ export default {
   getLavalinkEvents,
   createPlayer,
   getPlayer,
-  getQueue,
   getAllPlayers,
   getAllQueues,
-  decodeTrack,
-  removeQueueTrack
+  decodeTrack
 }
