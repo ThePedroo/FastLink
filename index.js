@@ -24,7 +24,7 @@ function connectNode(object, infos, sPayload) {
       Authorization: object.password,
       'Num-Shards': infos.shards,
       'User-Id': infos.botId,
-      'Client-Name': 'Fastlink@1.1.5'
+      'Client-Name': 'Fastlink@1.1.8'
     }
   })
 
