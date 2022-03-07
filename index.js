@@ -24,7 +24,7 @@ function connectNode(object, infos, sPayload) {
       Authorization: object.password,
       'Num-Shards': infos.shards,
       'User-Id': infos.botId,
-      'Client-Name': 'Fastlink@1.1.7'
+      'Client-Name': 'Fastlink@1.1.5'
     }
   })
 
@@ -359,7 +359,7 @@ class PlayerFunctions {
             }).then((res) => {
               if (res.loadType != 'SEARCH_RESULT') return resolve(res)
             
-              resolve({ loadType: 'SEARCH_RESULT', playlistInfo: {}, tracks: [{ track: res.tracks[0].track, info: { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, length: x.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.album.images[0].url, position: 0, title: x.name, uri: x.external_urls.spotify, sourceName: 'spotify' } }] })
+              resolve({ loadType: 'SEARCH_RESULT', playlistInfo: {}, tracks: [{ track: res.tracks[0].track, info: { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, author: x.artists.map(artist => artist.name).join(', '), length: x.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.album.images[0].url, position: 0, title: x.name, uri: x.external_urls.spotify, sourceName: 'spotify' } }] })
             })
           } if (track[1] == 'episode') {
             if (x?.error?.status == 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
@@ -370,7 +370,7 @@ class PlayerFunctions {
             }).then((res) => {
               if (res.loadType != 'SEARCH_RESULT') return resolve(res)
             
-              resolve({ loadType: 'SEARCH_RESULT', playlistInfo: {}, tracks: [{ track: res.tracks[0].track, info: { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, length: x.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.images[0].url, position: 0, title: x.name, uri: x.external_urls.spotify, sourceName: 'spotify' } }] })
+              resolve({ loadType: 'SEARCH_RESULT', playlistInfo: {}, tracks: [{ track: res.tracks[0].track, info: { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, author: null, length: x.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.images[0].url, position: 0, title: x.name, uri: x.external_urls.spotify, sourceName: 'spotify' } }] })
             })
           } else {
             if (track[1] == 'playlist') {
