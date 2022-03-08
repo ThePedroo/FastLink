@@ -29,6 +29,6 @@
   
 ## Observations
 
-  This is a function from the [createPlayer](docs/createPlayer.md)/[getPlayer](docs/getPlayer.md) functions. You **will** need one of them for use this function.
+  This is a function from the [createPlayer](createPlayer.md)/[getPlayer](getPlayer.md) functions. You **will** need one of them for use this function.
 
-  This function is ignored if the option for the FastLink handle the Queue it's not set for true. See [connectNode](docs/connectNode.md) options for enable it.
+  This function is ignored if the option for the FastLink handle the Queue it's not set for true. See [connectNode](connectNode.md) options for enable it.
