@@ -29,4 +29,4 @@
   
 ## Observations
 
-  You can only use this function if the guildId has a player on it. If it doesn't, see [createPlayer](docs/createPlayer.md) function for create one.
+  You can only use this function if the guildId has a player on it. If it doesn't, see [createPlayer](createPlayer.md) function for create one.
