@@ -32,7 +32,7 @@
   
   ## Observations
 
-  This is a function from the [createPlayer](docs/createPlayer.md)/[getPlayer](docs/getPlayer.md) functions. You **will** need one of them for use this function.
+  This is a function from the [createPlayer](createPlayer.md)/[getPlayer](getPlayer.md) functions. You **will** need one of them for use this function.
   
   If the first parameter is not specified, default is true.
   
