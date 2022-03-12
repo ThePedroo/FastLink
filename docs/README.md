@@ -17,7 +17,7 @@ A lightweight, memory-efficient Lavalink wrapper using Node.js.
 
   ```js
   // CommonJs
-  const Lavalink = require('fastlink')
+  const Lavalink = require('fastlink') // This will not work, recommended to use ES6 instead.
 
 
   // ES6
