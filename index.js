@@ -329,7 +329,7 @@ function createPlayer(config) {
   if (config && typeof config != 'object') throw new Error('createPlayer parameter must be a object with guildId and voiceChannelId keys.')
   if (typeof config.guildId != 'string' && typeof config.guildId != 'number') throw new Error('guildId field must be a string or a number.')
   if (typeof config.voiceChannelId != 'string' && typeof config.voiceChannelId != 'number') throw new Error('voiceChannelId field must be a string or a number.')
-
+  
   config.freeze()
 
   let players = map.get('players') || {}
@@ -402,6 +402,8 @@ class PlayerFunctions {
   constructor(config) {
     /** @type {{ guildId: number, voiceChannelId: number }} */
     this.config = config
+    
+    config.freeze()
   }
 
   /**
