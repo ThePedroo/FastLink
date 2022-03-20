@@ -13,7 +13,7 @@
   
   const player = Lavalink.getPlayer(message.guild.id)
   
-  const queue = Player.getQueue()
+  const queue = player.getQueue()
 
   queue.forEach((x) => console.log(x))
   
@@ -22,7 +22,7 @@
   
   const player = Lavalink.getPlayer(message.guildID)
   
-  const queue = Plater.getQueue()
+  const queue = player.getQueue()
 
   queue.forEach((x) => console.log(x))
   ```
