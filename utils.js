@@ -17,7 +17,7 @@ function makeRequest(url, options, Infos) {
     let req, data = ''
     
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      let node = Object.values(Infos.LoadBalancing).filter((x) => x.Ws._readyState == 1).sort((b, a) => a.Status.cpu ? (a.Status.cpu.systemLoad / a.Status.cpu.cores) * 100 : 0 - b.Status.cpu ? (b.Status.cpu.systemLoad / b.Status.cpu.cores) * 100 : 0)[0]
+      let node = Object.values(Infos.LoadBalancing).filter((x) => x.Ws._readyState === 1).sort((b, a) => a.Status.cpu ? (a.Status.cpu.systemLoad / a.Status.cpu.cores) * 100 : 0 - b.Status.cpu ? (b.Status.cpu.systemLoad / b.Status.cpu.cores) * 100 : 0)[0]
         
       if (!node) throw new Error('There is no node online.')
         
@@ -183,7 +183,7 @@ function onMessage(data, Infos, map, sendJson, x) {
                   noReplace: typeof data.noReplace == 'boolean' ? data.noReplace : false,
                   pause: false
                 }, players[data.guildId].node)
-                if (response?.error == true) throw new Error(response.message)
+                if (response.error === true) throw new Error(response.message)
 
                 if (data.reason.startsWith('FAKE_TRACK_END') && data.reason != 'FAKE_TRACK_END_SKIP') {
                   if (!queue[data.guildId]) queue[data.guildId] = []
@@ -223,7 +223,7 @@ function onMessage(data, Infos, map, sendJson, x) {
                 noReplace: false,
                 pause: false
               }, players[data.guildId].node)
-              if (response?.error == true) throw new Error(response.message)
+              if (response.error === true) throw new Error(response.message)
 
               queue[data.guildId].shift()
 
@@ -256,7 +256,7 @@ function onMessage(data, Infos, map, sendJson, x) {
                 noReplace: false,
                 pause: false
               }, players[data.guildId].node)
-              if (response?.error == true) throw new Error(response.message)
+              if (response.error === true) throw new Error(response.message)
 
               queue[data.guildId].shift()
 
@@ -299,5 +299,7 @@ function onMessage(data, Infos, map, sendJson, x) {
 function getEvent() { 
   return Event 
 }
+
+export default { makeRequest, debug, onOpen, onClose, onError, onMessage, getEvent }
 
 export default { makeRequest, debug, onOpen, onClose, onError, onMessage, getEvent }
