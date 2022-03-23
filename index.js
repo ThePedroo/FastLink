@@ -180,7 +180,7 @@ function handleRaw(data) {
  * @returns All Lavalink stats
  */
 
- function getAllLavalinkStats() {
+function getAllLavalinkStats() {
   return Infos.LoadBalancing
 }
 
@@ -311,7 +311,7 @@ class PlayerFunctions {
       if (queue[this.config.guildId] && queue[this.config.guildId][0]) {
         queue[this.config.guildId].push(track)
       } else {
-       Infos.LoadBalancing[players[this.config.guildId].node].Ws.emit('message', JSON.stringify({ op: 'event', type: 'TrackEndEvent', guildId: this.config.guildId, reason: 'FAKE_TRACK_END', track: track, noReplace }))
+        Infos.LoadBalancing[players[this.config.guildId].node].Ws.emit('message', JSON.stringify({ op: 'event', type: 'TrackEndEvent', guildId: this.config.guildId, reason: 'FAKE_TRACK_END', track: track, noReplace }))
       }
     } else {
       let response = sendJson({ op: 'play', guildId: this.config.guildId, track: track, noReplace: false, pause: false }, players[this.config.guildId].node)
@@ -369,13 +369,20 @@ class PlayerFunctions {
 
         let end;
         switch (track[1]) {
-          case 'track': { end = `/tracks/${track[2]}`; break }
-          case 'playlist': { end = `/playlists/${track[2]}`; break }
-          case 'album': { end = `/albums/${track[2]}`; break }
-          case 'episode': { end = `/episodes/${track[2]}?market=${Infos.Configs.SpotifyMarket}`; break }
-          default: {
+          case 'track':
+            end = `/tracks/${track[2]}`;
+            break
+          case 'playlist':
+            end = `/playlists/${track[2]}`;
+            break
+          case 'album':
+            end = `/albums/${track[2]}`;
+            break
+          case 'episode':
+            end = `/episodes/${track[2]}?market=${Infos.Configs.SpotifyMarket}`
+            break
+          default:
             return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
-          }
         }
 
         makeSpotifyRequest(end).then(async (x) => {
@@ -438,12 +445,17 @@ class PlayerFunctions {
         let end;
 
         switch (track[1]) {
-          case 'track': { end = `track/${track[2]}`; break }
-          case 'playlist': { end = `playlist/${track[2]}`; break }
-          case 'album': { end = `album/${track[2]}`; break }
-          default: {
+          case 'track':
+            end = `track/${track[2]}`
+            break
+          case 'playlist':
+            end = `playlist/${track[2]}`
+            break
+          case 'album':
+            end = `album/${track[2]}`
+            break
+          default:
             return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
-          }
         }
 
         Utils.makeRequest(`https://api.deezer.com/${end}`, {
@@ -520,7 +532,7 @@ class PlayerFunctions {
    * Stop playing the music, doesn't destroy the player.
    * @returns {Error | undefined} Will error if fails to send stop payload to the Lavalink.
    */
-  stop() {
+   stop() {
     let players = map.get('players') || {}
 
     let response = sendJson({ op: 'stop', guildId: this.config.guildId }, players[this.config.guildId].node)
