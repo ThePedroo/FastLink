@@ -532,7 +532,7 @@ class PlayerFunctions {
    * Stop playing the music, doesn't destroy the player.
    * @returns {Error | undefined} Will error if fails to send stop payload to the Lavalink.
    */
-   stop() {
+  stop() {
     let players = map.get('players') || {}
 
     let response = sendJson({ op: 'stop', guildId: this.config.guildId }, players[this.config.guildId].node)
