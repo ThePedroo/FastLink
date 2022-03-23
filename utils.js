@@ -50,7 +50,7 @@ function makeRequest(url, options, Infos) {
     })
 
     req.on('error', (error) => {
-      throw new Error(`Failed sending message`, error)
+      throw new Error('Failed sending message', error)
     })
 
     req.end()
@@ -76,7 +76,7 @@ function reconnect(ws, Infos, sendJson, map, x, nodes, infos) {
   ws.on('message', (data) => {
     Infos = onMessage(data, Infos, map, sendJson, x)
   })
-  return { ws, Infos }
+  return ws, Infos
 }
 
 function onOpen(Infos, ws, x, nodes) {
@@ -120,7 +120,7 @@ function onClose(code, ws, Infos, sendJson, map, x, nodes, infos) {
     debug('Removed all players related to the offline node.')
     Event.emit('trackStart', (nodes, code))
   }
-  return { ws: ws, Infos: Infos }
+  return { ws, Infos }
 }
     
 function onError(error, nodes, x) {
@@ -271,7 +271,7 @@ function onMessage(data, Infos, map, sendJson, x) {
           break
         }
         case 'WebSocketClosedEvent': {
-          if (data.reason == 'Your session is no longer valid.') Event.emit('warn', `Session ID is no longer valid. You should check if you have the handleRaw, and if you are not using the method to connect to the voice channel of your Discord library.\nIn case of none of these are the problem, the problem is with FastLink, please submit a bug report.`)
+          if (data.reason == 'Your session is no longer valid.') Event.emit('warn', 'Session ID is no longer valid. You should check if you have the handleRaw, and if you are not using the method to connect to the voice channel of your Discord library.\nIn case of none of these are the problem, the problem is with FastLink, please submit a bug report.')
           else Event.emit('warn', `Lavalink error message: ${data.reason}.\nThis is probably not a problem with FastLink, but if it is, please submit a bug report.`)
 
           delete data.op
