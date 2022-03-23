@@ -49,8 +49,8 @@ function makeRequest(url, options, Infos) {
       })
     })
 
-    req.on('error', (e) => {
-      throw new Error(`Failed sending message`)
+    req.on('error', (error) => {
+      throw new Error(`Failed sending message`, error)
     })
 
     req.end()
@@ -299,7 +299,5 @@ function onMessage(data, Infos, map, sendJson, x) {
 function getEvent() { 
   return Event 
 }
-
-export default { makeRequest, debug, onOpen, onClose, onError, onMessage, getEvent }
 
 export default { makeRequest, debug, onOpen, onClose, onError, onMessage, getEvent }
