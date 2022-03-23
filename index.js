@@ -26,7 +26,7 @@ function connectNodes(nodes, infos, sPayload) {
   if (!Array.isArray(nodes) || Object(infos) != infos)
     throw new Error(`${Array.isArray(nodes) ? 'first parameter must be an array' : Object(infos) == infos ? 'second parameter must be an object' : ''}.`)
 
-  if (nodes.length == 0)
+  if (nodes.length === 0)
     throw new Error('First parameter must be an array with at least one object in it.')
 
   if (infos.market && typeof infos.market != 'string')
@@ -90,7 +90,7 @@ function connectNodes(nodes, infos, sPayload) {
 }
 
 function getRecommendedNode() {
-  let node = Object.values(Infos.LoadBalancing).filter((x) => x?.Ws?._readyState == 1).sort((b, a) => a.Status.cpu ? (a.Status.cpu.systemLoad / a.Status.cpu.cores) * 100 : 0 - b.Status.cpu ? (b.Status.cpu.systemLoad / b.Status.cpu.cores) * 100 : 0)[0]
+  let node = Object.values(Infos.LoadBalancing).filter((x) => x?.Ws?._readyState === 1).sort((b, a) => a.Status.cpu ? (a.Status.cpu.systemLoad / a.Status.cpu.cores) * 100 : 0 - b.Status.cpu ? (b.Status.cpu.systemLoad / b.Status.cpu.cores) * 100 : 0)[0]
 
   if (!node) throw new Error('There is no node online.')
 
@@ -158,7 +158,7 @@ function handleRaw(data) {
             'endpoint': data.d.endpoint
           }
         }, players[data.d.guild_id].node)
-        if (response.error == true) throw new Error(response.message)
+        if (response.error === true) throw new Error(response.message)
 
         delete sessionIDs[data.d.guild_id]
 
@@ -315,7 +315,7 @@ class PlayerFunctions {
       }
     } else {
       let response = sendJson({ op: 'play', guildId: this.config.guildId, track: track, noReplace: false, pause: false }, players[this.config.guildId].node)
-      if (response.error == true) throw new Error(response.message)
+      if (response.error === true) throw new Error(response.message)
     }
 
     map.set('players', players)
@@ -341,7 +341,7 @@ class PlayerFunctions {
         track.tracks.forEach((x) => queue[this.config.guildId].push(x.track))
         
         let response = sendJson({ op: 'play', guildId: this.config.guildId, track: queue[this.config.guildId][0], pause: false }, players[this.config.guildId].node)
-        if (response.error == true) throw new Error(response.message)
+        if (response.error === true) throw new Error(response.message)
       
         players[this.config.guildId] = { ...players[this.config.guildId], playing: true, track: queue[this.config.guildId][0], paused: false }
         map.set('players', players)
@@ -507,7 +507,7 @@ let i = 0
     let players = map.get('players') || {}
 
     let response = sendJson({ op: 'stop', guildId: this.config.guildId }, players[this.config.guildId].node)
-    if (response.error == true) throw new Error(response.message)
+    if (response.error === true) throw new Error(response.message)
 
     if (players[this.config.guildId]) {
       players[this.config.guildId] = { ...players[this.config.guildId], playing: false, track: null }
@@ -525,7 +525,7 @@ let i = 0
     let queue = map.get('queue') || {}
 
     let response = sendJson({ op: 'stop', guildId: this.config.guildId }, players[this.config.guildId].node)
-    if (response.error == true) throw new Error(response.message)
+    if (response.error === true) throw new Error(response.message)
 
     delete players[this.config.guildId]
     delete queue[this.config.guildId]
@@ -545,7 +545,7 @@ let i = 0
     let players = map.get('players') || {}
 
     let response = sendJson({ op: 'volume', guildId: this.config.guildId, volume }, players[this.config.guildId].node)
-    if (response.error == true) throw new Error(response.message)
+    if (response.error === true) throw new Error(response.message)
   }
 
   /**
@@ -558,15 +558,15 @@ let i = 0
 
     let players = map.get('players') || {}
 
-    players[this.config.guildId] = { ...players[this.config.guildId], playing: pause == true ? false : true, paused: pause }
+    players[this.config.guildId] = { ...players[this.config.guildId], playing: pause === true ? false : true, paused: pause }
     map.set('players', players)
 
     let response = sendJson({ op: 'pause', guildId: this.config.guildId, pause }, players[this.config.guildId].node)
-    if (response.error == true) throw new Error(response.message)
+    if (response.error === true) throw new Error(response.message)
   }
 
   /**
-   * Removes a track from the queue, if position == 0, it will remove and skip music.
+   * Removes a track from the queue, if position === 0, it will remove and skip music.
    * @param {number} position The position of the track on the queue.
    * @returns {Error | undefined} Will error if position is invalid, if there is no track with the specified position or if the queue is empty.
    */
@@ -577,8 +577,8 @@ let i = 0
     let guildQueue = map.get('queue') || {}
     let player = map.get('players') || {}
   
-    if (guildQueue[this.config.guildId] && guildQueue[this.config.guildId].length != 0) {
-      if (position == 0) {
+    if (guildQueue[this.config.guildId] && guildQueue[this.config.guildId].length !== 0) {
+      if (position === 0) {
         if (!guildQueue[this.config.guildId][1]) throw new Error('Queue is empty, cannot remove track.')
         Infos.LoadBalancing[players[this.config.guildId].node].Ws.emit('message', JSON.stringify({ op: 'event', type: 'TrackEndEvent', guildId: this.config.guildId, reason: 'FAKE_TRACK_END_SKIP', track: guildQueue[this.config.guildId][0] }))
       }
@@ -613,7 +613,7 @@ let i = 0
     let players = map.get('players') || {}
 
     let response = sendJson({ op: 'filters', guildId: this.config.guildId, rotation: { rotationHz: 0.2 } }, players[this.config.guildId].node)
-    if (response.error == true) throw new Error(response.message)
+    if (response.error === true) throw new Error(response.message)
   }
     
   /**
@@ -633,7 +633,7 @@ let i = 0
         filterWidth: 100.0
       }
     }, players[this.config.guildId].node)
-    if (response.error == true) throw new Error(response.message)
+    if (response.error === true) throw new Error(response.message)
   }
 
   /**
@@ -644,7 +644,7 @@ let i = 0
     let players = map.get('players') || {}
 
     let response = sendJson(payload, players[this.config.guildId].node)
-    if (response.error == true) throw new Error(response.message)
+    if (response.error === true) throw new Error(response.message)
   }
 }
 
