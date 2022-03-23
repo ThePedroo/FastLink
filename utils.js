@@ -76,7 +76,7 @@ function reconnect(ws, Infos, sendJson, map, x, nodes, infos) {
   ws.on('message', (data) => {
     Infos = onMessage(data, Infos, map, sendJson, x)
   })
-  return ws, Infos
+  return { ws, Infos }
 }
 
 function onOpen(Infos, ws, x, nodes) {
