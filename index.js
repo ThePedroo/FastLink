@@ -63,7 +63,7 @@ function connectNodes(nodes, infos, sPayload) {
     if (x.port && typeof x.port != 'number' || x.port > 65535 || x.port < 0)
       throw new Error('node\'s port field must be a number from the range of 0 to')
     if (x.password && typeof x.password != 'string')
-      throw new Error('node\'s password must be a string.') 
+      throw new Error('node\'s password must be a string.')
 
     let ws = new WebSocket(`${x.secure ? 'wss://' : 'ws://'}${x.hostname}${x.port != undefined ? `:${x.port}` : ''}`, undefined, {
       headers: {
@@ -85,7 +85,7 @@ function connectNodes(nodes, infos, sPayload) {
       Infos = Utils.onMessage(data, Infos, map, sendJson, x)
     })
   })
-  
+
   return Event
 }
 
@@ -115,7 +115,7 @@ function makeSpotifyRequest(endpoint) {
     }).then((res) => {
       if (res?.error?.status == 401) {
         Utils.makeRequest('https://open.spotify.com/get_access_token', {
-          headers: {}, 
+          headers: {},
           method: 'GET'
         }).then((spotify) => {
           Infos.Configs.SpotifyToken = spotify.accessToken
@@ -198,7 +198,7 @@ function createPlayer(config) {
   Object.freeze(config)
 
   let players = map.get('players') || {}
-  
+
   let url = new URL(getRecommendedNode().Ws._url)
 
   players[config.guildId] = { voiceChannelId: config.voiceChannelId, playing: false, track: null, paused: false, node: url.host }
@@ -217,7 +217,7 @@ function getPlayer(guildId) {
   if (typeof guildId != 'string' && typeof guildId != 'number') throw new Error('guildId field must be a string or a number.')
 
   let guildPlayer = map.get('players') || {}
-  
+
   if (guildPlayer[guildId]) {
     return (new PlayerFunctions({ guildId, voiceChannelId: guildPlayer[guildId].voiceChannelId }))
   }
@@ -292,19 +292,19 @@ class PlayerFunctions {
     if (typeof track != 'string') throw new Error('track parameter must be a string.')
 
     let players = map.get('players') || {}
-    
+
     if (players[this.config.guildId]) {
       if (players[this.config.guildId].node){
         players[this.config.guildId] = { ...players[this.config.guildId], playing: true, track, paused: false }
       } else {
         Utils.debug('Node doesn\'t have a recommended node. This should not happen, please report this issue. FastLink will handle that for now.')
-        
+
         let url = new URL(getRecommendedNode().Ws._url)
-        
+
         players[this.config.guildId] = { voiceChannelId: this.config.voiceChannelId, playing: true, track, paused: false, node: url.host }   
       }
     }
-      
+
     if (Infos.Configs.Queue) {
       let queue = map.get('queue') || {}
 
@@ -332,21 +332,21 @@ class PlayerFunctions {
 
       let queue = map.get('queue') || {}
       let players = map.get('players') || {}
-        
+
       if (queue[this.config.guildId]) {
         track.tracks.forEach((x) => queue[this.config.guildId].push(x.track))
       } else {
         queue[this.config.guildId] = []
 
         track.tracks.forEach((x) => queue[this.config.guildId].push(x.track))
-        
+
         let response = sendJson({ op: 'play', guildId: this.config.guildId, track: queue[this.config.guildId][0], pause: false }, players[this.config.guildId].node)
         if (response.error === true) throw new Error(response.message)
-      
+
         players[this.config.guildId] = { ...players[this.config.guildId], playing: true, track: queue[this.config.guildId][0], paused: false }
         map.set('players', players)
       }
-      
+
       map.set('queue', queue)
     }
   }
@@ -359,15 +359,15 @@ class PlayerFunctions {
   search(music) {
     if (!/^https?:\/\//.test(music)) music = `ytsearch:${music}`
     if (/^https?:\/\/(?:soundcloud\.com|snd\.sc)(?:\/\w+(?:-\w+)*)+$/.test(music)) music = `sc:${music}`
-      
+
     return new Promise((resolve) => {
       let spotifyRegex = /(?:https:\/\/open\.spotify\.com\/|spotify:)(?:.+)?(track|playlist|artist|episode|show|album)[/:]([A-Za-z0-9]+)/
       let deezerRegex = /^https?:\/\/(?:www\.)?deezer\.com\/(track|album|playlist)\/(\d+)$/
-      
+
       if (spotifyRegex.test(music)) {
         let track = spotifyRegex.exec(music)
-        
-        let end; 
+
+        let end;
         switch (track[1]) {
           case 'track': { end = `/tracks/${track[2]}`; break }
           case 'playlist': { end = `/playlists/${track[2]}`; break }
@@ -380,38 +380,48 @@ class PlayerFunctions {
 
         makeSpotifyRequest(end).then(async (x) => {
           if (track[1] == 'track') {
-            if (x?.error?.status == 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
+            if (x.error) {
+              if (x.error.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
+              return resolve({ loadType: 'LOAD_FAILED', playlistInfo: {}, tracks: [], exception: { message: x.error.message, severity: 'UNKNOWN' } })
+            }
+
             Utils.makeRequest(`loadtracks?identifier=ytsearch:${encodeURIComponent(`${x.name} ${x.artists[0].name}`)}`, {}, Infos).then((res) => {
               if (res.loadType != 'SEARCH_RESULT') return resolve(res)
-            
+
               resolve({ loadType: 'SEARCH_RESULT', playlistInfo: {}, tracks: [{ track: res.tracks[0].track, info: { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, author: x.artists.map(artist => artist.name).join(', '), length: x.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.album.images[0].url, position: 0, title: x.name, uri: x.external_urls.spotify, sourceName: 'spotify' } }] })
             })
           } if (track[1] == 'episode') {
-            if (x?.error?.status == 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
+            if (x.error) {
+              if (x.error.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
+              return resolve({ loadType: 'LOAD_FAILED', playlistInfo: {}, tracks: [], exception: { message: x.error.message, severity: 'UNKNOWN' } })
+            }
             Utils.makeRequest(`loadtracks?identifier=ytsearch:${encodeURIComponent(x.name)}`, {}, Infos).then((res) => {
               if (res.loadType != 'SEARCH_RESULT') return resolve(res)
-            
+
               resolve({ loadType: 'SEARCH_RESULT', playlistInfo: {}, tracks: [{ track: res.tracks[0].track, info: { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, author: null, length: x.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.images[0].url, position: 0, title: x.name, uri: x.external_urls.spotify, sourceName: 'spotify' } }] })
             })
           } else {
             if (track[1] == 'playlist' || track[1] == 'album') {
-              if (x?.error?.status == 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
-              
+              if (x.error) {
+                if (x.error.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
+                return resolve({ loadType: 'LOAD_FAILED', playlistInfo: {}, tracks: [], exception: { message: x.error.message, severity: 'UNKNOWN' } })
+              }
+
               let i = 0
               let response = { loadType: 'PLAYLIST_LOADED', playlistInfo: { selectedTrack: -1, name: x.name }, tracks: [] }
               x.tracks.items.forEach(async (x2) => {
                 x2.position = i
                 i++
-                
+
                 let res;
                 if (track[1] == 'playlist') res = await Utils.makeRequest(`loadtracks?identifier=ytsearch:${encodeURIComponent(`${x2.track.name} ${x2.track.artists[0].name}`)}`, {}, Infos)
                 else res = await Utils.makeRequest(`loadtracks?identifier=ytsearch:${encodeURIComponent(`${x2.name} ${x2.artists[0].name}`)}`, {}, Infos)
-              
+
                 if (res.loadType != 'SEARCH_RESULT') {
                   if (i == x.tracks.items.length) return resolve(res)
                   return;
                 }
-                
+
                 if (track[1] == 'playlist') response.tracks.push({ track: res.tracks[0].track, info: { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, author: x2.track.artists.map(artist => artist.name).join(', '), length: x2.track.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.images[0].url, position: x2.position, title: x2.track.name, uri: x2.track.external_urls.spotify, sourceName: 'spotify' } })
                 else response.tracks.push({ track: res.tracks[0].track, info: { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, author: x2.artists.map(artist => artist.name).join(', '), length: x2.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.images[0].url, position: x2.position, title: x2.name, uri: x2.external_urls.spotify, sourceName: 'spotify' } })
 
@@ -426,7 +436,7 @@ class PlayerFunctions {
       } else if (deezerRegex.test(music)) {
         let track = deezerRegex.exec(music)
         let end;
-        
+
         switch (track[1]) {
           case 'track': { end = `track/${track[2]}`; break }
           case 'playlist': { end = `playlist/${track[2]}`; break }
@@ -441,29 +451,36 @@ class PlayerFunctions {
           method: 'GET'
         }).then((x) => {
           if (track[1] == 'track') {
-            if (x?.error?.status == 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
-            if (x?.error) return resolve({ loadType: 'LOAD_FAILED', playlistInfo: {}, tracks: [], exception: { message: x.error.message, severity: 'UNKNOWN' } })
+            if (x.error) {
+              if (x.error.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
+              return resolve({ loadType: 'LOAD_FAILED', playlistInfo: {}, tracks: [], exception: { message: x.error.message, severity: 'UNKNOWN' } })
+            }
+
             Utils.makeRequest(`loadtracks?identifier=ytsearch:${encodeURIComponent(`${x.title} ${x.artist.name}`)}`, {}, Infos).then((res) => {
               if (res.loadType != 'SEARCH_RESULT') return resolve(res)
-            
+
               resolve({ loadType: 'SEARCH_RESULT', playlistInfo: {}, tracks: [{ track: res.tracks[0].track, info: { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, author: x.artist.name, length: x.duration * 1000, isStream: res.tracks[0].info.isStream, artwork: x.album.cover_xl, position: 0, title: x.title, uri: x.link, sourceName: 'deezer' } }] })
             })
           }
           if (track[1] == 'playlist' || track[1] == 'album') {
-            if (x?.error?.status == 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
-            if (x?.error) return resolve({ loadType: 'LOAD_FAILED', playlistInfo: {}, tracks: [], exception: { message: x.error.message, severity: 'UNKNOWN' } })
-let i = 0
+            if (x.error) {
+              if (x.error.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
+              return resolve({ loadType: 'LOAD_FAILED', playlistInfo: {}, tracks: [], exception: { message: x.error.message, severity: 'UNKNOWN' } })
+            }
+
+            let i = 0
+
             let response = { loadType: 'PLAYLIST_LOADED', playlistInfo: { selectedTrack: -1, name: x.title }, tracks: [] }
             x.tracks.data.forEach(async (x2) => {
               x2.position = i
               i++
-                
+
               let res = await Utils.makeRequest(`loadtracks?identifier=ytsearch:${encodeURIComponent(`${x2.title} ${x2.artist.name}`)}`, {}, Infos)
               if (res.loadType != 'SEARCH_RESULT') {
                 if (i == x.tracks.data.length) return resolve(res)
                 return;
               }
-                
+
               response.tracks.push({ track: res.tracks[0].track, info: { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, author: x2.artist.name, length: x.duration * 1000, isStream: res.tracks[0].info.isStream, artwork: x.picture_xl, position: x2.position, title: x2.title, uri: x2.link, sourceName: 'deezer' } })
 
               if (response.tracks.length == x.tracks.data.length) {
@@ -516,7 +533,7 @@ let i = 0
     }
   }
 
-  /** 
+  /**
    * Destroys a players, it will leave the voice channel and clear guild queue.
    * @returns {Error | undefined} Will error if fails to send destroy payload to the Lavalink.
    */
@@ -529,13 +546,13 @@ let i = 0
 
     delete players[this.config.guildId]
     delete queue[this.config.guildId]
-    
+
     map.set('players', players)
     map.set('queue', queue)
   }
 
   /**
-   * Changes the player's track volume. 
+   * Changes the player's track volume.
    * @param {number} volume The volume that will be set for this track.
    * @returns {Error | undefined} Will error if volume is invalid or if fails to send volume payload to the Lavalink.
    */
@@ -573,10 +590,10 @@ let i = 0
   removeTrack(position) {
     if (!Infos.Configs.Queue) return;
     if (typeof position != 'string' && typeof position != 'number') throw new Error('position field must be a string or a number.')
-  
+
     let guildQueue = map.get('queue') || {}
-    let player = map.get('players') || {}
-  
+    let players = map.get('players') || {}
+
     if (guildQueue[this.config.guildId] && guildQueue[this.config.guildId].length !== 0) {
       if (position === 0) {
         if (!guildQueue[this.config.guildId][1]) throw new Error('Queue is empty, cannot remove track.')
@@ -584,10 +601,10 @@ let i = 0
       }
     } else {
       if (!guildQueue[this.config.guildId][Number(position)]) throw new Error('There is no track with this position, cannot remove track.')
-          
+
       guildQueue[this.config.guildId][Number(position)] = null
       guildQueue[this.config.guildId] = guildQueue[this.config.guildId].filter((x) => x != null)
-  
+
       map.set('queue', guildQueue)
     }
   }
@@ -598,9 +615,9 @@ let i = 0
    */
   getQueue() {
     if (!Infos.Configs.Queue) return;
-  
+
     let guildQueue = map.get('queue') || []
-    
+
     if (guildQueue[this.config.guildId]) return guildQueue[this.config.guildId]
     return guildQueue
   }
@@ -615,7 +632,7 @@ let i = 0
     let response = sendJson({ op: 'filters', guildId: this.config.guildId, rotation: { rotationHz: 0.2 } }, players[this.config.guildId].node)
     if (response.error === true) throw new Error(response.message)
   }
-    
+
   /**
    * Set the karaoke effect on the player.
    * @returns {Error | undefined} Will error if it fails to send the message to a Lavalink node.
@@ -648,7 +665,7 @@ let i = 0
   }
 }
 
-export default { 
+export default {
   connectNodes,
   handleRaw,
   getAllLavalinkStats,
