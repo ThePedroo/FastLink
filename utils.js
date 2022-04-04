@@ -95,9 +95,9 @@ async function search(music, createTrack) {
 
     if (data.videoRenderer) {
       let length = data.videoRenderer.lengthText ? data.videoRenderer.lengthText.simpleText : 0
-      if (length != 0) length = length.split(':')
+      if (length !== 0) length = length.split(':')
 
-      if (length && length.length == 3) length = (Number(length[0]) * 3600000) + (Number(length[1]) * 60000) + (Number(length[2]) * 1000)
+      if (length && length.length === 3) length = (Number(length[0]) * 3600000) + (Number(length[1]) * 60000) + (Number(length[2]) * 1000)
       else if (length) length = (Number(length[0]) * 60000) + (Number(length[1]) * 1000)
 
       let info = {
@@ -280,7 +280,7 @@ function onMessage(data, Infos, map, sendJson, x) {
                   noReplace: typeof data.noReplace == 'boolean' ? data.noReplace : false,
                   pause: false
                 }, players[data.guildId].node)
-                if (response.error == true) throw new Error(response.message)
+                if (response.error === true) throw new Error(response.message)
 
                 if (data.reason.startsWith('FAKE_TRACK_END') && data.reason != 'FAKE_TRACK_END_SKIP') {
                   if (!queue[data.guildId]) queue[data.guildId] = []
@@ -497,7 +497,7 @@ function encodeTrack(obj) {
   out.write('utf', obj.sourceName)
   out.write('long', BigInt(obj.position))
   out.write('byte', obj.isSeekable ? 1 : 0)
-  if (obj.uri.startsWith('https://www.youtube.com/watch/?v=')) out.write('utf', obj.artwork)
+  out.write('utf', obj.artwork)
 
   const buffer = out.result()
   const result = Buffer.alloc(buffer.length + 4)
