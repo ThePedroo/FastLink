@@ -29,7 +29,7 @@ let Infos = { Configs: {}, LoadBalancing: {}, sendDiscordPayload: null }
  */
 function connectNodes(object) {
   if (!object || !Array.isArray(object.nodes) || Object(object.informations) != object.informations)
-    throw new Error(`${Array.isArray(object.nodes) ? 'nodes key must be an array' : Object(object) == object ? 'informations key must be an object' : ''}.`)
+    throw new Error(`${Array.isArray(object.nodes) ? 'nodes key must be an array' : Object(object) === object ? 'informations key must be an object' : ''}.`)
 
   if (object.nodes.length === 0)
     throw new Error('First parameter must be an array with at least one object in it.')
@@ -102,7 +102,7 @@ function connectNodes(object) {
 }
 
 function getRecommendedNode() {
-  let node = Object.values(Infos.LoadBalancing).filter((x) => x.Ws?._readyState == 1).sort((b, a) => a.Stats.cpu ? (a.Stats.cpu.systemLoad / a.Stats.cpu.cores) * 100 : 0 - b.Sttus.cpu ? (b.Stats.cpu.systemLoad / b.Stats.cpu.cores) * 100 : 0)[0]
+  let node = Object.values(Infos.LoadBalancing).filter((x) => x.Ws?._readyState === 1).sort((b, a) => a.Stats.cpu ? (a.Stats.cpu.systemLoad / a.Stats.cpu.cores) * 100 : 0 - b.Sttus.cpu ? (b.Stats.cpu.systemLoad / b.Stats.cpu.cores) * 100 : 0)[0]
 
   if (!node) throw new Error('There is no node online.')
 
@@ -125,7 +125,7 @@ function makeSpotifyRequest(endpoint) {
       headers: { 'Authorization': `Bearer ${Infos.Configs.SpotifyToken}` },
       method: 'GET'
     }).then((res) => {
-      if (res.error?.status == 401) {
+      if (res.error?.status === 401) {
         Utils.makeRequest('https://open.spotify.com/get_access_token', {
           headers: {}, 
           method: 'GET'
@@ -152,7 +152,7 @@ function handleRaw(data) {
   setImmediate(() => {
     if (![ 'VOICE_SERVER_UPDATE', 'VOICE_STATE_UPDATE' ].includes(data.t)) return;
 
-    if (data.t == 'VOICE_SERVER_UPDATE') {
+    if (data.t === 'VOICE_SERVER_UPDATE') {
       let sessionIDs = map.get('sessionIDs') || {}
       let players = map.get('players') || {}
 
@@ -173,7 +173,7 @@ function handleRaw(data) {
       let sessionIDs = map.get('sessionIDs') || {}
       sessionIDs[data.d.guild_id] = data.d.session_id
 
-      if (data.d.member.user.id == Infos.Configs.UserId) map.set('sessionIDs', sessionIDs)
+      if (data.d.member.user.id === Infos.Configs.UserId) map.set('sessionIDs', sessionIDs)
     }
   })
 }
@@ -267,7 +267,7 @@ function decodeTrack(track) {
   if (/(?:https:\/\/open\.spotify\.com\/|spotify:)/.test(uri)) sourceName = 'spotify'
   if (/^https?:\/\/(?:www\.)?deezer\.com\//.test(uri)) sourceName = 'deezer'
 
-  artwork = sourceName == 'youtube' ? `https://i.ytimg.com/vi/${identifier}/maxresdefault.jpg` : input.read('utf')
+  artwork = sourceName === 'youtube' ? `https://i.ytimg.com/vi/${identifier}/maxresdefault.jpg` : input.read('utf')
 
   return { identifier, isSeekable, author, length, isStream, position, title, uri, artwork, sourceName }
 }
@@ -333,7 +333,7 @@ class PlayerFunctions {
       }
     } else {
       let response = sendJson({ op: 'play', guildId: this.config.guildId, track: track, noReplace: false, pause: false }, players[this.config.guildId].node)
-      if (response.error == true) throw new Error(response.message)
+      if (response.error === true) throw new Error(response.message)
     }
 
     map.set('players', players)
@@ -359,7 +359,7 @@ class PlayerFunctions {
         track.tracks.forEach((x) => queue[this.config.guildId].push(x.track))
         
         let response = sendJson({ op: 'play', guildId: this.config.guildId, track: queue[this.config.guildId][0], pause: false }, players[this.config.guildId].node)
-        if (response.error == true) throw new Error(response.message)
+        if (response.error === true) throw new Error(response.message)
       
         players[this.config.guildId] = { ...players[this.config.guildId], playing: true, track: queue[this.config.guildId][0], paused: false }
         map.set('players', players)
@@ -397,8 +397,8 @@ class PlayerFunctions {
         }
 
         makeSpotifyRequest(end).then(async (x) => {
-          if (track[1] == 'track') {
-            if (x.error?.status == 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
+          if (track[1] === 'track') {
+            if (x.error?.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
             if (x.error) return resolve({ loadType: 'LOAD_FAILED', playlistInfo: {}, tracks: [], exception: { message: x.error.message, severity: 'UNKNOWN' } })
 
             Utils.search(`${x.name} ${x.artists[0].name}`, false).then((res) => {
@@ -408,8 +408,8 @@ class PlayerFunctions {
             
               resolve({ loadType: 'SEARCH_RESULT', playlistInfo: {}, tracks: [{ track: Utils.encodeTrack({ ...info, sourceName: 'youtube' }), info }] })
             })
-          } if (track[1] == 'episode') {
-            if (x.error?.status == 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
+          } if (track[1] === 'episode') {
+            if (x.error?.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
             Utils.search(`${x.name} ${x.publisher}`, false).then((res) => {
               if (res.loadType != 'SEARCH_RESULT') return resolve(res)
                 
@@ -418,34 +418,34 @@ class PlayerFunctions {
               resolve({ loadType: 'SEARCH_RESULT', playlistInfo: {}, tracks: [{ track: Utils.encodeTrack({ ...info, sourceName: 'youtube' }), info }] })
             })
           } else {
-            if (track[1] == 'playlist' || track[1] == 'album') {
-              if (x.error?.status == 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
+            if (track[1] === 'playlist' || track[1] === 'album') {
+              if (x.error?.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
               if (x.error) return resolve({ loadType: 'LOAD_FAILED', playlistInfo: {}, tracks: [], exception: { message: x.error.message, severity: 'UNKNOWN' } })
               
               let info, response = { loadType: 'PLAYLIST_LOADED', playlistInfo: { selectedTrack: -1, name: x.name }, tracks: [] }
               x.tracks.items.forEach(async (x2, index) => {
                 let res;
-                if (track[1] == 'playlist') res = await Utils.search(`${x2.track.name} ${x2.track.artists[0].name}`, false)
+                if (track[1] === 'playlist') res = await Utils.search(`${x2.track.name} ${x2.track.artists[0].name}`, false)
                 else res = await Utils.search(`${x2.name} ${x2.artists[0].name}`, false)
 
                 if (res.loadType != 'SEARCH_RESULT') {
-                  if (index == x.tracks.items.length) return resolve(res)
+                  if (index === x.tracks.items.length) return resolve(res)
                   return;
                 }
 
-                if (track[1] == 'playlist') info = { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, author: x2.track.artists.map(artist => artist.name).join(', '), length: x2.track.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.images[0].url, position: index, title: x2.track.name, uri: x2.track.external_urls.spotify, sourceName: 'spotify' }
+                if (track[1] === 'playlist') info = { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, author: x2.track.artists.map(artist => artist.name).join(', '), length: x2.track.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.images[0].url, position: index, title: x2.track.name, uri: x2.track.external_urls.spotify, sourceName: 'spotify' }
                 else info = { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, author: x2.artists.map(artist => artist.name).join(', '), length: x2.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.images[0].url, position: index, title: x2.name, uri: x2.external_urls.spotify, sourceName: 'spotify' }
 
                 response.tracks.push({ track: Utils.encodeTrack({ ...info, sourceName: 'youtube' }), info })
 
-                if (response.tracks.length == x.tracks.items.length) {
+                if (response.tracks.length === x.tracks.items.length) {
                   response.tracks.sort((a, b) => a.info.position - b.info.position)
                   resolve(response)
                 }
               })
             }
-            if (track[1] == 'show') {
-              if (x.error?.status == 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
+            if (track[1] === 'show') {
+              if (x.error?.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
               if (x.error) return resolve({ loadType: 'LOAD_FAILED', playlistInfo: {}, tracks: [], exception: { message: x.error.message, severity: 'UNKNOWN' } })
               
               let response = { loadType: 'PLAYLIST_LOADED', playlistInfo: { selectedTrack: -1, name: x.name }, tracks: [] }
@@ -453,7 +453,7 @@ class PlayerFunctions {
                 let res = await Utils.search(`${x2.name} ${x.publisher}`, false)
 
                 if (res.loadType != 'SEARCH_RESULT') {
-                  if (index == x.episodes.items.length) return resolve(res)
+                  if (index === x.episodes.items.length) return resolve(res)
                   return;
                 }
 
@@ -461,7 +461,7 @@ class PlayerFunctions {
 
                 response.tracks.push({ track: Utils.encodeTrack({ ...info, sourceName: 'youtube' }), info })
 
-                if (response.tracks.length == x.episodes.items.length) {
+                if (response.tracks.length === x.episodes.items.length) {
                   response.tracks.sort((a, b) => a.info.position - b.info.position)
                   resolve(response)
                 }
@@ -486,8 +486,8 @@ class PlayerFunctions {
           headers: {},
           method: 'GET'
         }).then((x) => {
-          if (track[1] == 'track') {
-            if (x.error?.status == 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
+          if (track[1] === 'track') {
+            if (x.error?.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
             if (x.error) return resolve({ loadType: 'LOAD_FAILED', playlistInfo: {}, tracks: [], exception: { message: x.error.message, severity: 'UNKNOWN' } })
             Utils.search(`${x.title} ${x.artist.name}`, false).then((res) => {
               if (res.loadType != 'SEARCH_RESULT') return resolve(res)
@@ -497,23 +497,23 @@ class PlayerFunctions {
               resolve({ loadType: 'SEARCH_RESULT', playlistInfo: {}, tracks: [{ track: Utils.encodeTrack({ ...info, sourceName: 'youtube' }), info }] })
             })
           }
-          if (track[1] == 'playlist' || track[1] == 'album') {
-            if (x.error?.status == 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
+          if (track[1] === 'playlist' || track[1] === 'album') {
+            if (x.error?.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
             if (x.error) return resolve({ loadType: 'LOAD_FAILED', playlistInfo: {}, tracks: [], exception: { message: x.error.message, severity: 'UNKNOWN' } })
             
             let response = { loadType: 'PLAYLIST_LOADED', playlistInfo: { selectedTrack: -1, name: x.title }, tracks: [] }
             x.tracks.data.forEach(async (x2, index) => {                
               let res = await Utils.search(`${x2.title} ${x2.artist.name}`, false)
               if (res.loadType != 'SEARCH_RESULT') {
-                if (index == x.tracks.data.length) return resolve(res)
+                if (index === x.tracks.data.length) return resolve(res)
                 return;
               }
 
-              let info = { ...res.tracks[0].info,  author: x2.artist.name, length: x.duration * 1000, artwork: track[1] == 'playlist' ? x.picture_xl : x.cover_xl, position: index, title: x2.title, uri: x2.link, sourceName: 'deezer' }
+              let info = { ...res.tracks[0].info,  author: x2.artist.name, length: x.duration * 1000, artwork: track[1] === 'playlist' ? x.picture_xl : x.cover_xl, position: index, title: x2.title, uri: x2.link, sourceName: 'deezer' }
 
               response.tracks.push({ track: Utils.encodeTrack({ ...info, sourceName: 'youtube' }), info })
 
-              if (response.tracks.length == x.tracks.data.length) {
+              if (response.tracks.length === x.tracks.data.length) {
                 response.tracks.sort((a, b) => a.info.position - b.info.position)
                 resolve(response)
               }
@@ -549,7 +549,7 @@ class PlayerFunctions {
     let players = map.get('players') || {}
 
     let response = sendJson({ op: 'stop', guildId: this.config.guildId }, players[this.config.guildId].node)
-    if (response.error == true) throw new Error(response.message)
+    if (response.error === true) throw new Error(response.message)
 
     if (players[this.config.guildId]) {
       players[this.config.guildId] = { ...players[this.config.guildId], playing: false, track: null }
@@ -573,7 +573,7 @@ class PlayerFunctions {
     let players = map.get('players') || {}
 
     let response = sendJson({ op: 'destroy', guildId: this.config.guildId }, players[this.config.guildId].node)
-    if (response.error == true) throw new Error(response.message)
+    if (response.error === true) throw new Error(response.message)
       
     if (Infos.Configs.Queue) {
       let queue = map.get('queue') || {}
@@ -612,7 +612,7 @@ class PlayerFunctions {
     let players = map.get('players') || {}
 
     let response = sendJson({ op: 'volume', guildId: this.config.guildId, volume }, players[this.config.guildId].node)
-    if (response.error == true) throw new Error(response.message)
+    if (response.error === true) throw new Error(response.message)
   }
 
   /**
@@ -625,15 +625,15 @@ class PlayerFunctions {
 
     let players = map.get('players') || {}
 
-    players[this.config.guildId] = { ...players[this.config.guildId], playing: pause == true ? false : true, paused: pause }
+    players[this.config.guildId] = { ...players[this.config.guildId], playing: pause === true ? false : true, paused: pause }
     map.set('players', players)
 
     let response = sendJson({ op: 'pause', guildId: this.config.guildId, pause }, players[this.config.guildId].node)
-    if (response.error == true) throw new Error(response.message)
+    if (response.error === true) throw new Error(response.message)
   }
 
   /**
-   * Removes a track from the queue, if position == 0, it will remove and skip music.
+   * Removes a track from the queue, if position === 0, it will remove and skip music.
    * @param {number} position The position of the track on the queue.
    * @returns {Error | undefined} Will error if position is invalid, if there is no track with the specified position or if the queue is empty.
    */
@@ -682,7 +682,7 @@ class PlayerFunctions {
       guildId: this.config.guildId,
       ...body
     }, players[this.config.guildId].node)
-    if (response.error == true) throw new Error(response.message)
+    if (response.error === true) throw new Error(response.message)
   }
 
   /**
@@ -721,7 +721,7 @@ class PlayerFunctions {
     let players = map.get('players') || {}
 
     let response = sendJson(payload, players[this.config.guildId].node)
-    if (response.error == true) throw new Error(response.message)
+    if (response.error === true) throw new Error(response.message)
   }
 }
 
