@@ -31,7 +31,7 @@ function connectNodes(object) {
   if (!object || !Array.isArray(object.nodes) || Object(object.informations) != object.informations)
     throw new Error(`${Array.isArray(object.nodes) ? 'nodes key must be an array' : Object(object) == object ? 'informations key must be an object' : ''}.`)
 
-  if (object.nodes.length == 0)
+  if (object.nodes.length === 0)
     throw new Error('First parameter must be an array with at least one object in it.')
 
   if (object.informations.market && typeof object.informations.market != 'string')
@@ -163,7 +163,7 @@ function handleRaw(data) {
           'sessionId': sessionIDs[data.d.guild_id],
           'event': data.d
         }, players[data.d.guild_id].node)
-        if (response.error == true) throw new Error(response.message)
+        if (response.error === true) throw new Error(response.message)
 
         delete sessionIDs[data.d.guild_id]
 
@@ -644,8 +644,8 @@ class PlayerFunctions {
       let guildQueue = map.get('queue') || {}
       let players = map.get('players') || {}
 
-      if (guildQueue[this.config.guildId] && guildQueue[this.config.guildId].length == 1) {
-        if (position == 0) {
+      if (guildQueue[this.config.guildId] && guildQueue[this.config.guildId].length === 1) {
+        if (position === 0) {
           if (!guildQueue[this.config.guildId][1]) throw new Error('Queue is empty, cannot remove track.')
 
           Infos.LoadBalancing[players[this.config.guildId].node].Ws.emit('message', JSON.stringify({ op: 'event', type: 'TrackEndEvent', guildId: this.config.guildId, reason: 'FAKE_TRACK_END_SKIP', track: guildQueue[this.config.guildId][1] }))
