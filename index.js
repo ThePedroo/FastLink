@@ -278,6 +278,7 @@ class PlayerFunctions {
    */
   constructor(config) {
     this.config = config
+    Object.freeze(this.config)
   }
 
   /**
