@@ -114,15 +114,15 @@ async function search(music, createTrack) {
       }
 
       tracks[index] = {
-        track: createTrack == true ? encodeTrack(info) : null,
+        track: createTrack === true ? encodeTrack(info) : null,
         info
       }
       index++
     } else {
       let length = data.playlistVideoRenderer.lengthText ? data.playlistVideoRenderer.lengthText.simpleText : 0
-      if (length != 0) length = length.split(':')
+      if (length !== 0) length = length.split(':')
 
-      if (length && length.length == 3) length = (Number(length[0]) * 3600000) + (Number(length[1]) * 60000) + (Number(length[2]) * 1000)
+      if (length && length.length === 3) length = (Number(length[0]) * 3600000) + (Number(length[1]) * 60000) + (Number(length[2]) * 1000)
       else if (length) length = (Number(length[0]) * 60000) + (Number(length[1]) * 1000)
 
       let info = {
@@ -139,7 +139,7 @@ async function search(music, createTrack) {
       }
 
       tracks[index] = {
-        track: createTrack == true ? encodeTrack(info) : null,
+        track: createTrack === true ? encodeTrack(info) : null,
         info
       }
       index++
@@ -183,8 +183,7 @@ function onClose(code, ws, Infos, sendJson, map, x, informations) {
 
   let node = Infos.LoadBalancing[`${x.hostname}${x.port != undefined ? `:${x.port}` : ''}`]
 
-  if (!node) node = {}
-  if (!node.Reconnects) node = { Reconnects: 0 }
+  if (!node) node = { Reconnects: 0 }
 
   if (Infos.Configs.MaxTries <= -1 || node.Reconnects <= Infos.Configs.MaxTries) {
     setTimeout(() => {
@@ -321,7 +320,7 @@ function onMessage(data, Infos, map, sendJson, x) {
                 noReplace: false,
                 pause: false
               }, players[data.guildId].node)
-              if (response.error == true) throw new Error(response.message)
+              if (response.error === true) throw new Error(response.message)
 
               queue[data.guildId].shift()
 
@@ -396,9 +395,9 @@ function onMessage(data, Infos, map, sendJson, x) {
 }
 
 class EncodeClass {
-  constructor(size) {
+  constructor() {
     this.position = 0
-    this.buffer = Buffer.alloc(size || 256)
+    this.buffer = Buffer.alloc(256)
   }
 
   changeBytes(bytes) {
@@ -464,21 +463,26 @@ class DecodeClass {
 
   read(type) {
     switch (type) {
-      case 'byte':
+      case 'byte': {
         return this.buffer[this.changeBytes(1)]
-      case 'unsignedShort':
+      }
+      case 'unsignedShort': {
         return this.buffer.readUInt16BE(this.changeBytes(2))
-      case 'int':
+      }
+      case 'int': {
         return this.buffer.readInt32BE(this.changeBytes(4))
-      case 'long':
+      }
+      case 'long': {
         const msb = this.read('int')
         const lsb = this.read('int')
 
         return BigInt(msb) * BigInt(2 ** 32) + BigInt(lsb)
-      case 'utf':
+      }
+      case 'utf': {
         const lenght = this.read('unsignedShort')
         const start = this.changeBytes(lenght)
         return this.buffer.toString('utf8', start, start + lenght)
+      }
     }
   }
 }

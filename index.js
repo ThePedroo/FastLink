@@ -150,30 +150,33 @@ function makeSpotifyRequest(endpoint) {
  */
 function handleRaw(data) {
   setImmediate(() => {
-    if (![ 'VOICE_SERVER_UPDATE', 'VOICE_STATE_UPDATE' ].includes(data.t)) return;
-
-    if (data.t === 'VOICE_SERVER_UPDATE') {
-      let sessionIDs = map.get('sessionIDs') || {}
-      let players = map.get('players') || {}
-
-      if (sessionIDs[data.d.guild_id]) {
-        let response = sendJson({
-          'op': 'voiceUpdate',
-          'guildId': data.d.guild_id,
-          'sessionId': sessionIDs[data.d.guild_id],
-          'event': data.d
-        }, players[data.d.guild_id].node)
-        if (response.error === true) throw new Error(response.message)
-
-        delete sessionIDs[data.d.guild_id]
-
-        map.set('sessionIds', sessionIDs)
+    switch (data.t) {
+      case 'VOICE_SERVER_UPDATE': {
+        let sessionIDs = map.get('sessionIDs') || {}
+        let players = map.get('players') || {}
+  
+        if (sessionIDs[data.d.guild_id]) {
+          let response = sendJson({
+            'op': 'voiceUpdate',
+            'guildId': data.d.guild_id,
+            'sessionId': sessionIDs[data.d.guild_id],
+            'event': data.d
+          }, players[data.d.guild_id].node)
+          if (response.error === true) throw new Error(response.message)
+  
+          delete sessionIDs[data.d.guild_id]
+  
+          map.set('sessionIds', sessionIDs)
+        }
+        break
       }
-    } else {
-      let sessionIDs = map.get('sessionIDs') || {}
-      sessionIDs[data.d.guild_id] = data.d.session_id
+      case 'VOICE_STATE_UPDATE': {
+        let sessionIDs = map.get('sessionIDs') || {}
+        sessionIDs[data.d.guild_id] = data.d.session_id
 
-      if (data.d.member.user.id === Infos.Configs.UserId) map.set('sessionIDs', sessionIDs)
+        if (data.d.member.user.id === Infos.Configs.UserId) map.set('sessionIDs', sessionIDs)
+        break
+      }
     }
   })
 }
@@ -398,28 +401,33 @@ class PlayerFunctions {
         }
 
         makeSpotifyRequest(end).then(async (x) => {
-          if (track[1] === 'track') {
-            if (x.error?.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
-            if (x.error) return resolve({ loadType: 'LOAD_FAILED', playlistInfo: {}, tracks: [], exception: { message: x.error.message, severity: 'UNKNOWN' } })
-
-            Utils.search(`${x.name} ${x.artists[0].name}`, false).then((res) => {
-              if (res.loadType != 'SEARCH_RESULT') return resolve(res)
-
-              let info = { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, author: x.artists.map(artist => artist.name).join(', '), length: x.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.album.images[0].url, position: 0, title: x.name, uri: x.external_urls.spotify, sourceName: 'spotify' }
-            
-              resolve({ loadType: 'SEARCH_RESULT', playlistInfo: {}, tracks: [{ track: Utils.encodeTrack({ ...info, sourceName: 'youtube' }), info }] })
-            })
-          } if (track[1] === 'episode') {
-            if (x.error?.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
-            Utils.search(`${x.name} ${x.publisher}`, false).then((res) => {
-              if (res.loadType != 'SEARCH_RESULT') return resolve(res)
-                
-              let info = { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, author: null, length: x.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.images[0].url, position: 0, title: x.name, uri: x.external_urls.spotify, sourceName: 'spotify' }
-            
-              resolve({ loadType: 'SEARCH_RESULT', playlistInfo: {}, tracks: [{ track: Utils.encodeTrack({ ...info, sourceName: 'youtube' }), info }] })
-            })
-          } else {
-            if (track[1] === 'playlist' || track[1] === 'album') {
+          switch (track[1]) {
+            case 'track': {
+              if (x.error?.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
+              if (x.error) return resolve({ loadType: 'LOAD_FAILED', playlistInfo: {}, tracks: [], exception: { message: x.error.message, severity: 'UNKNOWN' } })
+  
+              Utils.search(`${x.name} ${x.artists[0].name}`, false).then((res) => {
+                if (res.loadType != 'SEARCH_RESULT') return resolve(res)
+  
+                let info = { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, author: x.artists.map(artist => artist.name).join(', '), length: x.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.album.images[0].url, position: 0, title: x.name, uri: x.external_urls.spotify, sourceName: 'spotify' }
+              
+                resolve({ loadType: 'SEARCH_RESULT', playlistInfo: {}, tracks: [{ track: Utils.encodeTrack({ ...info, sourceName: 'youtube' }), info }] })
+              })
+              break
+            }
+            case 'episode': {
+              if (x.error?.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
+              Utils.search(`${x.name} ${x.publisher}`, false).then((res) => {
+                if (res.loadType != 'SEARCH_RESULT') return resolve(res)
+                  
+                let info = { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, author: null, length: x.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.images[0].url, position: 0, title: x.name, uri: x.external_urls.spotify, sourceName: 'spotify' }
+              
+                resolve({ loadType: 'SEARCH_RESULT', playlistInfo: {}, tracks: [{ track: Utils.encodeTrack({ ...info, sourceName: 'youtube' }), info }] })
+              })
+              break
+            }
+            case 'playlist':
+            case 'album': {
               if (x.error?.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
               if (x.error) return resolve({ loadType: 'LOAD_FAILED', playlistInfo: {}, tracks: [], exception: { message: x.error.message, severity: 'UNKNOWN' } })
               
@@ -444,8 +452,9 @@ class PlayerFunctions {
                   resolve(response)
                 }
               })
+              break
             }
-            if (track[1] === 'show') {
+            case 'show': {
               if (x.error?.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
               if (x.error) return resolve({ loadType: 'LOAD_FAILED', playlistInfo: {}, tracks: [], exception: { message: x.error.message, severity: 'UNKNOWN' } })
               
@@ -467,62 +476,77 @@ class PlayerFunctions {
                   resolve(response)
                 }
               })
+              break
+            }
+            default: {
+              if (deezerRegex.test(music)) {
+                let track = deezerRegex.exec(music)
+                let end;
+        
+                switch (track[1]) {
+                  case 'track': 
+                    end = `track/${track[2]}`
+                    break
+                  case 'playlist': 
+                    end = `playlist/${track[2]}`
+                    break
+                  case 'album': 
+                    end = `album/${track[2]}`
+                    break
+                  default:
+                    return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
+                }
+        
+                Utils.makeRequest(`https://api.deezer.com/${end}`, {
+                  headers: {},
+                  method: 'GET'
+                }).then((x) => {
+                  switch (track[1]) {
+                    case 'track': {
+                      if (x.error?.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
+                      if (x.error) return resolve({ loadType: 'LOAD_FAILED', playlistInfo: {}, tracks: [], exception: { message: x.error.message, severity: 'UNKNOWN' } })
+                      Utils.search(`${x.title} ${x.artist.name}`, false).then((res) => {
+                        if (res.loadType != 'SEARCH_RESULT') return resolve(res)
+          
+                        let info = { ...res.tracks[0].info, author: x.artist.name, length: x.duration * 1000, artwork: x.album.cover_xl, position: 0, title: x.title, uri: x.link, sourceName: 'deezer' }
+          
+                        resolve({ loadType: 'SEARCH_RESULT', playlistInfo: {}, tracks: [{ track: Utils.encodeTrack({ ...info, sourceName: 'youtube' }), info }] })
+                      })
+                      break
+                    }
+                    case 'playlist':
+                    case 'album': {
+                      if (x.error?.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
+                      if (x.error) return resolve({ loadType: 'LOAD_FAILED', playlistInfo: {}, tracks: [], exception: { message: x.error.message, severity: 'UNKNOWN' } })
+                      
+                      let response = { loadType: 'PLAYLIST_LOADED', playlistInfo: { selectedTrack: -1, name: x.title }, tracks: [] }
+                      x.tracks.data.forEach(async (x2, index) => {                
+                        let res = await Utils.search(`${x2.title} ${x2.artist.name}`, false)
+                        if (res.loadType != 'SEARCH_RESULT') {
+                          if (index === x.tracks.data.length) return resolve(res)
+                          return;
+                        }
+          
+                        let info = { ...res.tracks[0].info,  author: x2.artist.name, length: x.duration * 1000, artwork: track[1] === 'playlist' ? x.picture_xl : x.cover_xl, position: index, title: x2.title, uri: x2.link, sourceName: 'deezer' }
+          
+                        response.tracks.push({ track: Utils.encodeTrack({ ...info, sourceName: 'youtube' }), info })
+          
+                        if (response.tracks.length === x.tracks.data.length) {
+                          response.tracks.sort((a, b) => a.info.position - b.info.position)
+                          resolve(response)
+                        }
+                      })
+                      break
+                    }
+                  }
+                })
+              } else {
+                Utils.search(music, true).then((res) => resolve(res))
+              }
+              break
             }
           }
         })
-      } else if (deezerRegex.test(music)) {
-        let track = deezerRegex.exec(music)
-        let end;
-
-        switch (track[1]) {
-          case 'track': { end = `track/${track[2]}`; break }
-          case 'playlist': { end = `playlist/${track[2]}`; break }
-          case 'album': { end = `album/${track[2]}`; break }
-          default: {
-            return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
-          }
-        }
-
-        Utils.makeRequest(`https://api.deezer.com/${end}`, {
-          headers: {},
-          method: 'GET'
-        }).then((x) => {
-          if (track[1] === 'track') {
-            if (x.error?.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
-            if (x.error) return resolve({ loadType: 'LOAD_FAILED', playlistInfo: {}, tracks: [], exception: { message: x.error.message, severity: 'UNKNOWN' } })
-            Utils.search(`${x.title} ${x.artist.name}`, false).then((res) => {
-              if (res.loadType != 'SEARCH_RESULT') return resolve(res)
-
-              let info = { ...res.tracks[0].info, author: x.artist.name, length: x.duration * 1000, artwork: x.album.cover_xl, position: 0, title: x.title, uri: x.link, sourceName: 'deezer' }
-
-              resolve({ loadType: 'SEARCH_RESULT', playlistInfo: {}, tracks: [{ track: Utils.encodeTrack({ ...info, sourceName: 'youtube' }), info }] })
-            })
-          }
-          if (track[1] === 'playlist' || track[1] === 'album') {
-            if (x.error?.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
-            if (x.error) return resolve({ loadType: 'LOAD_FAILED', playlistInfo: {}, tracks: [], exception: { message: x.error.message, severity: 'UNKNOWN' } })
-            
-            let response = { loadType: 'PLAYLIST_LOADED', playlistInfo: { selectedTrack: -1, name: x.title }, tracks: [] }
-            x.tracks.data.forEach(async (x2, index) => {                
-              let res = await Utils.search(`${x2.title} ${x2.artist.name}`, false)
-              if (res.loadType != 'SEARCH_RESULT') {
-                if (index === x.tracks.data.length) return resolve(res)
-                return;
-              }
-
-              let info = { ...res.tracks[0].info,  author: x2.artist.name, length: x.duration * 1000, artwork: track[1] === 'playlist' ? x.picture_xl : x.cover_xl, position: index, title: x2.title, uri: x2.link, sourceName: 'deezer' }
-
-              response.tracks.push({ track: Utils.encodeTrack({ ...info, sourceName: 'youtube' }), info })
-
-              if (response.tracks.length === x.tracks.data.length) {
-                response.tracks.sort((a, b) => a.info.position - b.info.position)
-                resolve(response)
-              }
-            })
-          }
-        })
-      } else {
-        Utils.search(music, true).then((res) => resolve(res))
       }
     })
   }
