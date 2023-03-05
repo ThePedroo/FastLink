@@ -17,8 +17,9 @@
     "Music"
   ],
   "dependencies": {
-    "ws": "latest",
-    "@types/ws": "latest"
+    "@types/ws": "latest",
+    "discord.js": "^13.6.0",
+    "ws": "latest"
   },
   "repository": {
     "type": "git",

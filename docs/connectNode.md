@@ -11,20 +11,21 @@
   ```js
   // Discord.js example
 
-  const events = Lavalink.connectNode([{ host: 'example.com', secure: true, password: 'youshallnotpass', port: undefined }], { market: 'US', shards: 1, botId: '1234567891011121314' }, (guildId, payload) => {
-    client.guilds.cache.get(guildId).shard.send(payload)
-  })
+  const events = Lavalink.connectNodes({
+    nodes: [{ hostname: 'example.com', secure: true, password: 'youshallnotpass', port: undefined }], 
+    informations: { market: 'US', shards: 1, botId: '1234567891011121314', autoQueue: true }, 
+    sendDiscordPayload: (guildId, payload) => {
+      // Discord.js example
+      client.guilds.cache.get(guildId).shard.send(JSON.parse(payload))
 
-
-  // Eris example
-
-  const events = Lavalink.connectNode([{ host: 'example.com', secure: true, password: 'youshallnotpass', port: undefined }], { market: 'US', shards: 1, botId: '1234567891011121314' }, (guildId, payload) => {
-    client.guilds.get(guildId).shard.ws.send(payload)
+      // Eris example
+      client.guilds.get(guildId).shard.ws.send(payload)
+    }
   })
   
   
   events.on('trackStart', () => console.log('Playing music, now!'))
-  events.on('trackEnd', () => console.log('Stopped playing music! :(')
+  events.on('trackEnd', () => console.log('Stopped playing music! :('))
   ```
   
 ## Observations

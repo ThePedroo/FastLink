@@ -14,7 +14,7 @@
   
   let track = player.search('Rick Astley - Never Gonna Give You Up')
 
-  player.play(track.tracks[0].track)
+  player.play(track.tracks[0].encoded)
 
   setTimeout(() => player.destroy(), 5000)
   
@@ -25,7 +25,7 @@
   
   let track = player.search('Rick Astley - Never Gonna Give You Up')
 
-  player.play(track.tracks[0].track)
+  player.play(track.tracks[0].encoded)
 
   setTimeout(() => player.destroy(), 5000)
   ```

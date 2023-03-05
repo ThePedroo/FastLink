@@ -8,7 +8,7 @@ import WebSocket from 'ws'
 
 const map = new Map()
 
-let Infos = { Configs: {}, LoadBalancing: {}, sendDiscordPayload: null }
+let Infos = { Configs: {}, Nodes: {}, sendDiscordPayload: null }
 
 /**
  * @typedef {{ loadType: string, playlistInfo: { name: string, selectedTrack: number } | {}, tracks: Array<musicInfo>, exception: { message: string, exception: string } | undefined }} searchObject
@@ -77,24 +77,24 @@ function connectNodes(object) {
     if (x.password && typeof x.password != 'string')
       throw new Error('node\'s password must be a string.') 
 
-    let ws = new WebSocket(`${x.secure ? 'wss://' : 'ws://'}${x.hostname}${x.port != undefined ? `:${x.port}` : ''}`, undefined, {
+    let ws = new WebSocket(`${x.secure ? 'wss://' : 'ws://'}${x.hostname}${x.port != undefined ? `:${x.port}` : ''}/v4/websocket`, undefined, {
       headers: {
         Authorization: x.password,
         'Num-Shards': object.informations.shards,
         'User-Id': object.informations.botId,
-        'Client-Name': 'Fastlink@1.3.5'
+        'Client-Name': 'Fastlink@1.4.0'
       }
     })
 
     ws.on('open', () => Utils.onOpen(Infos, ws, x))
     ws.on('close', (code) => {
-      let res = Utils.onClose(code, ws, Infos, sendJson, map, x, object.informations)
+      let res = Utils.onClose(code, ws, Infos, map, x, object.informations)
       Infos = res.Infos
       ws = res.ws
     })
     ws.on('error', (error) => Utils.onError(error, x))
     ws.on('message', (data) => {
-      Infos = Utils.onMessage(data, Infos, map, sendJson, x)
+      Infos = Utils.onMessage(data, Infos, map, x)
     })
   })
   
@@ -102,21 +102,11 @@ function connectNodes(object) {
 }
 
 function getRecommendedNode() {
-  let node = Object.values(Infos.LoadBalancing).filter((x) => x.Ws?._readyState === 1).sort((b, a) => a.Stats.cpu ? (a.Stats.cpu.systemLoad / a.Stats.cpu.cores) * 100 : 0 - b.Sttus.cpu ? (b.Stats.cpu.systemLoad / b.Stats.cpu.cores) * 100 : 0)[0]
+  let node = Object.values(Infos.Nodes).filter((x) => x.Ws?._readyState === 1).sort((b, a) => a.stats.cpu ? (a.stats.cpu.systemLoad / a.stats.cpu.cores) * 100 : 0 - b.Sttus.cpu ? (b.stats.cpu.systemLoad / b.stats.cpu.cores) * 100 : 0)[0]
 
-  if (!node) throw new Error('There is no node online.')
+  if (!node) throw new Error('There are no nodes online.')
 
   return node
-}
-
-function sendJson(json, node) {
-  let response = { error: false, message: 'Sent with success.' }
-  Utils.debug(`Selected node ${Infos.LoadBalancing[node].Ws._url.replace('ws://', '').replace('wss://', '')} for send ${json.op} payload.`)
-  Infos.LoadBalancing[node].Ws.send(JSON.stringify(json), (error) => {
-    if (error) response = { error: true, message: error.message }
-  })
-
-  return response
 }
 
 function makeSpotifyRequest(endpoint) {
@@ -156,13 +146,21 @@ function handleRaw(data) {
         let players = map.get('players') || {}
   
         if (sessionIDs[data.d.guild_id]) {
-          let response = sendJson({
-            'op': 'voiceUpdate',
-            'guildId': data.d.guild_id,
-            'sessionId': sessionIDs[data.d.guild_id],
-            'event': data.d
-          }, players[data.d.guild_id].node)
-          if (response.error === true) throw new Error(response.message)
+          Utils.makeRequest(`${players[data.d.guild_id].ssl ? 'https://' : 'http://'}${players[data.d.guild_id].node}/v4/sessions/${Infos.Nodes[players[data.d.guild_id].node].sessionId}/players/${data.d.guild_id}`, {
+            headers: {
+              Authorization: Infos.Nodes[players[data.d.guild_id].node].password,
+              'Content-Type': 'application/json',
+              'Client-Name': 'FastLink'
+            },
+            body: {
+              voice: {
+                token: data.d.token,
+                endpoint: data.d.endpoint,
+                sessionId: sessionIDs[data.d.guild_id]
+              }
+            },
+            method: 'PATCH'
+          })
   
           delete sessionIDs[data.d.guild_id]
   
@@ -182,12 +180,12 @@ function handleRaw(data) {
 }
 
 /**
- * Get all Lavalink LoadBalancing (stats) information
+ * Get all Lavalink Nodes (stats) information
  * @returns All Lavalink stats
  */
 
 function getAllLavalinkStats() {
-  return Infos.LoadBalancing
+  return Infos.Nodes
 }
 
 /**
@@ -203,9 +201,9 @@ function createPlayer(config) {
 
   let players = map.get('players') || {}
 
-  let nodeUrl = getRecommendedNode().Ws._url.replace('ws://', '').replace('wss://', '')
+  let nodeUrl = getRecommendedNode().Ws._url
 
-  players[config.guildId] = { voiceChannelId: config.voiceChannelId, playing: false, track: null, paused: false, node: nodeUrl }
+  players[config.guildId] = { voiceChannelId: config.voiceChannelId, playing: false, paused: false, node: nodeUrl.replace('ws://', '').replace('wss://', '').replace('/v4/websocket', ''), ssl: nodeUrl.startsWith('wss://') }
   map.set('players', players)
 
   return (new PlayerFunctions(config))
@@ -243,38 +241,6 @@ function getAllQueues() {
   if (Infos.Configs.Queue) return map.get('queue') || {}
 }
 
-/**
- * Decoded a track, and returns it's music info.
- * @param {string} track - Track that will be decoded into the music informations.
- * @returns {musicInfo} The informations about the music.
- */
-
-function decodeTrack(track) {
-  if (typeof track != 'string') throw new Error('track field must be a string.')
-
-  const input = new Utils.DecodeClass(Buffer.from(track, 'base64'), Utils.getEvent().listeners('debug')[0] ? 0 : 5)
-  
-  if (Event.listeners('debug')[0]) Utils.debug(`Decoding track with version ${((input.read('int') & 0xC0000000) >> 30 & 1) !== 0 ? input.read('byte') : 1}.`)
-
-  let title = input.read('utf'),
-    author = input.read('utf'),
-    length = Number(input.read('long')),
-    identifier = input.read('utf'),
-    isStream = input.read('byte') !== 0,
-    uri = input.read('byte') !== 0 ? input.read('utf') : null,
-    sourceName = input.read('utf'),
-    position = Number(input.read('long')),
-    isSeekable = input.read('byte') !== 0,
-    artwork
-
-  if (/(?:https:\/\/open\.spotify\.com\/|spotify:)/.test(uri)) sourceName = 'spotify'
-  if (/^https?:\/\/(?:www\.)?deezer\.com\//.test(uri)) sourceName = 'deezer'
-
-  artwork = sourceName === 'youtube' ? `https://i.ytimg.com/vi/${identifier}/maxresdefault.jpg` : input.read('utf')
-
-  return { identifier, isSeekable, author, length, isStream, position, title, uri, artwork, sourceName }
-}
-
 class PlayerFunctions {
   /**
    * @param {object} config - Informations about the player.
@@ -282,6 +248,108 @@ class PlayerFunctions {
   constructor(config) {
     this.config = config
     Object.freeze(this.config)
+  }
+
+  async makeLavalinkRequest(type, options) {
+    let data;
+    switch (type) {
+      case 'custom': {
+        let players = map.get('players') || {}
+        data = await Utils.makeRequest(`${players[this.config.guildId].ssl ? 'https://' : 'http://'}${players[this.config.guildId].node}/v4/sessions/${Infos.Nodes[players[this.config.guildId].node].sessionId}/players/${this.config.guildId}?noReplace=${options.noReplace || 'false'}`, {
+          headers: {
+            Authorization: Infos.Nodes[players[this.config.guildId].node].password,
+            'Content-Type': 'application/json',
+            'Client-Name': 'FastLink',
+            'User-Agent': 'https'
+          },
+          method: 'PATCH',
+          body: options.body
+        })
+        break;
+      }
+      case 'search': {
+        let players = map.get('players') || {}
+        data = await Utils.makeRequest(`${players[this.config.guildId].ssl ? 'https://' : 'http://'}${players[this.config.guildId].node}/v4/loadtracks?identifier=ytsearch:${encodeURI(options.identifier)}`, {
+          headers: {
+            Authorization: Infos.Nodes[players[this.config.guildId].node].password,
+            'Content-Type': 'application/json',
+            'Client-Name': 'FastLink',
+            'User-Agent': 'https'
+          },
+          method: 'GET'
+        })
+        break;
+      }
+      case 'play': {
+        data = await this.makeLavalinkRequest('custom', {
+          body: {
+            encodedTrack: options.track
+          }
+        })
+        break;
+      }
+      case 'stop': {
+        data = await this.makeLavalinkRequest('custom', {
+          body: {
+            encodedTrack: null
+          }
+        })
+        break;
+      }
+      case 'destroy': {
+        let players = map.get('players') || {}
+        data = await Utils.makeRequest(`${players[this.config.guildId].ssl ? 'https://' : 'http://'}${players[this.config.guildId].node}/v4/sessions/${Infos.Nodes[players[this.config.guildId].node].sessionId}/players/${this.config.guildId}?noReplace=${options.noReplace || 'false'}`, {
+          headers: {
+            Authorization: Infos.Nodes[players[this.config.guildId].node].password,
+            'Content-Type': 'application/json',
+            'Client-Name': 'FastLink',
+            'User-Agent': 'https'
+          },
+          method: 'DELETE'
+        })
+        break;
+      }
+      case 'volume': {
+        data = await this.makeLavalinkRequest('custom', {
+          body: {
+            volume: options.volume
+          }
+        })
+        break;
+      }
+      case 'pause': {
+        data = await this.makeLavalinkRequest('custom', {
+          body: {
+            paused: options.pause
+          }
+        })
+        break;
+      }
+      case 'filter': {
+        data = await this.makeLavalinkRequest('custom', {
+          body: {
+            filters: options.filter
+          }
+        })
+        break;
+      }
+      case 'decodetrack': {
+        let players = map.get('players') || {}
+        data = await Utils.makeRequest(`${players[this.config.guildId].ssl ? 'https://' : 'http://'}${players[this.config.guildId].node}/v4/decodetrack?encodedTrack=${options.track}`, {
+          headers: {
+            Authorization: Infos.Nodes[players[this.config.guildId].node].password,
+            'Content-Type': 'application/json',
+            'Client-Name': 'FastLink',
+            'User-Agent': 'https'
+          },
+          method: 'GET'
+        })
+        break;
+      }
+    }
+  
+    if (data.error) throw new Error(data.error)
+    else return data
   }
 
   /**
@@ -330,14 +398,24 @@ class PlayerFunctions {
     if (Infos.Configs.Queue) {
       let queue = map.get('queue') || {}
 
-      if (queue[this.config.guildId] && queue[this.config.guildId][0]) {
-        queue[this.config.guildId].push(track)
-      } else {
-        Infos.LoadBalancing[players[this.config.guildId].node].Ws.emit('message', JSON.stringify({ op: 'event', type: 'TrackEndEvent', guildId: this.config.guildId, reason: 'FAKE_TRACK_END', track, noReplace }))
+      if (queue[this.config.guildId] && queue[this.config.guildId][0]) queue[this.config.guildId].push(track)
+      else {    
+        queue[this.config.guildId] = [ track ]
+   
+        this.makeLavalinkRequest('play', {
+          track,
+          noReplace,
+          pause: false
+        })
       }
+
+      map.set('queue', queue)
     } else {
-      let response = sendJson({ op: 'play', guildId: this.config.guildId, track: track, noReplace: false, pause: false }, players[this.config.guildId].node)
-      if (response.error === true) throw new Error(response.message)
+      this.makeLavalinkRequest('play', {
+        track,
+        noReplace,
+        pause: false
+      })
     }
 
     map.set('players', players)
@@ -362,10 +440,13 @@ class PlayerFunctions {
 
         track.tracks.forEach((x) => queue[this.config.guildId].push(x.track))
         
-        let response = sendJson({ op: 'play', guildId: this.config.guildId, track: queue[this.config.guildId][0], pause: false }, players[this.config.guildId].node)
-        if (response.error === true) throw new Error(response.message)
-      
-        players[this.config.guildId] = { ...players[this.config.guildId], playing: true, track: queue[this.config.guildId][0], paused: false }
+        this.makeLavalinkRequest('play', {
+          track: queue[this.config.guildId][0],
+          noReplace: false,
+          pause: false
+        })
+
+        players[this.config.guildId] = { ...players[this.config.guildId], playing: true, paused: false }
         map.set('players', players)
       }
       
@@ -401,41 +482,37 @@ class PlayerFunctions {
         }
 
         makeSpotifyRequest(end).then(async (x) => {
+          if (x.error?.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
+          if (x.error) return resolve({ loadType: 'LOAD_FAILED', playlistInfo: {}, tracks: [], exception: { message: x.error.message, severity: 'UNKNOWN' } })
+
           switch (track[1]) {
             case 'track': {
-              if (x.error?.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
-              if (x.error) return resolve({ loadType: 'LOAD_FAILED', playlistInfo: {}, tracks: [], exception: { message: x.error.message, severity: 'UNKNOWN' } })
-  
-              Utils.search(`${x.name} ${x.artists[0].name}`, false).then((res) => {
+              this.makeLavalinkRequest('search', { identifier: `${x.name} ${x.artists[0].name}` }).then((res) => {
                 if (res.loadType != 'SEARCH_RESULT') return resolve(res)
   
                 let info = { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, author: x.artists.map(artist => artist.name).join(', '), length: x.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.album.images[0].url, position: 0, title: x.name, uri: x.external_urls.spotify, sourceName: 'spotify' }
               
-                resolve({ loadType: 'SEARCH_RESULT', playlistInfo: {}, tracks: [{ track: Utils.encodeTrack({ ...info, sourceName: 'youtube' }), info }] })
+                resolve({ loadType: 'SEARCH_RESULT', playlistInfo: {}, tracks: [{ encoded: Utils.encodeTrack({ ...info, sourceName: 'youtube' }), info }] })
               })
               break
             }
             case 'episode': {
-              if (x.error?.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
-              Utils.search(`${x.name} ${x.publisher}`, false).then((res) => {
+              this.makeLavalinkRequest('search', { identifier: `${x.name} ${x.publisher}` }).then((res) => {
                 if (res.loadType != 'SEARCH_RESULT') return resolve(res)
                   
                 let info = { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, author: null, length: x.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.images[0].url, position: 0, title: x.name, uri: x.external_urls.spotify, sourceName: 'spotify' }
               
-                resolve({ loadType: 'SEARCH_RESULT', playlistInfo: {}, tracks: [{ track: Utils.encodeTrack({ ...info, sourceName: 'youtube' }), info }] })
+                resolve({ loadType: 'SEARCH_RESULT', playlistInfo: {}, tracks: [{ encoded: Utils.encodeTrack({ ...info, sourceName: 'youtube' }), info }] })
               })
               break
             }
             case 'playlist':
             case 'album': {
-              if (x.error?.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
-              if (x.error) return resolve({ loadType: 'LOAD_FAILED', playlistInfo: {}, tracks: [], exception: { message: x.error.message, severity: 'UNKNOWN' } })
-              
               let info, response = { loadType: 'PLAYLIST_LOADED', playlistInfo: { selectedTrack: -1, name: x.name }, tracks: [] }
               x.tracks.items.forEach(async (x2, index) => {
                 let res;
-                if (track[1] === 'playlist') res = await Utils.search(`${x2.track.name} ${x2.track.artists[0].name}`, false)
-                else res = await Utils.search(`${x2.name} ${x2.artists[0].name}`, false)
+                if (track[1] === 'playlist') res = await this.makeLavalinkRequest('search', { identifier: `${x2.track.name} ${x2.track.artists[0].name}` })
+                else res = await this.makeLavalinkRequest('search', { identifier: `${x2.name} ${x2.artists[0].name}` })
 
                 if (res.loadType != 'SEARCH_RESULT') {
                   if (index === x.tracks.items.length) return resolve(res)
@@ -445,7 +522,7 @@ class PlayerFunctions {
                 if (track[1] === 'playlist') info = { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, author: x2.track.artists.map(artist => artist.name).join(', '), length: x2.track.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.images[0].url, position: index, title: x2.track.name, uri: x2.track.external_urls.spotify, sourceName: 'spotify' }
                 else info = { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, author: x2.artists.map(artist => artist.name).join(', '), length: x2.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.images[0].url, position: index, title: x2.name, uri: x2.external_urls.spotify, sourceName: 'spotify' }
 
-                response.tracks.push({ track: Utils.encodeTrack({ ...info, sourceName: 'youtube' }), info })
+                response.tracks.push({ encoded: Utils.encodeTrack({ ...info, sourceName: 'youtube' }), info })
 
                 if (response.tracks.length === x.tracks.items.length) {
                   response.tracks.sort((a, b) => a.info.position - b.info.position)
@@ -455,12 +532,9 @@ class PlayerFunctions {
               break
             }
             case 'show': {
-              if (x.error?.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
-              if (x.error) return resolve({ loadType: 'LOAD_FAILED', playlistInfo: {}, tracks: [], exception: { message: x.error.message, severity: 'UNKNOWN' } })
-              
               let response = { loadType: 'PLAYLIST_LOADED', playlistInfo: { selectedTrack: -1, name: x.name }, tracks: [] }
               x.episodes.items.forEach(async (x2, index) => {
-                let res = await Utils.search(`${x2.name} ${x.publisher}`, false)
+                let res = await this.makeLavalinkRequest('search', { identifier: `${x2.name} ${x.publisher}` })
 
                 if (res.loadType != 'SEARCH_RESULT') {
                   if (index === x.episodes.items.length) return resolve(res)
@@ -469,7 +543,7 @@ class PlayerFunctions {
 
                 let info = { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, author: x.publisher, length: x2.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.images[0].url, position: index, title: x2.name, uri: x2.external_urls.spotify, sourceName: 'spotify' }
 
-                response.tracks.push({ track: Utils.encodeTrack({ ...info, sourceName: 'youtube' }), info })
+                response.tracks.push({ encoded: Utils.encodeTrack({ ...info, sourceName: 'youtube' }), info })
 
                 if (response.tracks.length === x.episodes.items.length) {
                   response.tracks.sort((a, b) => a.info.position - b.info.position)
@@ -505,12 +579,12 @@ class PlayerFunctions {
                     case 'track': {
                       if (x.error?.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
                       if (x.error) return resolve({ loadType: 'LOAD_FAILED', playlistInfo: {}, tracks: [], exception: { message: x.error.message, severity: 'UNKNOWN' } })
-                      Utils.search(`${x.title} ${x.artist.name}`, false).then((res) => {
+                      this.makeLavalinkRequest('search', { identifier: `${x.title} ${x.artist.name}` }).then((res) => {
                         if (res.loadType != 'SEARCH_RESULT') return resolve(res)
           
                         let info = { ...res.tracks[0].info, author: x.artist.name, length: x.duration * 1000, artwork: x.album.cover_xl, position: 0, title: x.title, uri: x.link, sourceName: 'deezer' }
           
-                        resolve({ loadType: 'SEARCH_RESULT', playlistInfo: {}, tracks: [{ track: Utils.encodeTrack({ ...info, sourceName: 'youtube' }), info }] })
+                        resolve({ loadType: 'SEARCH_RESULT', playlistInfo: {}, tracks: [{ encoded: Utils.encodeTrack({ ...info, sourceName: 'youtube' }), info }] })
                       })
                       break
                     }
@@ -521,7 +595,7 @@ class PlayerFunctions {
                       
                       let response = { loadType: 'PLAYLIST_LOADED', playlistInfo: { selectedTrack: -1, name: x.title }, tracks: [] }
                       x.tracks.data.forEach(async (x2, index) => {                
-                        let res = await Utils.search(`${x2.title} ${x2.artist.name}`, false)
+                        let res = await this.makeLavalinkRequest('search', { identifier: `${x2.title} ${x2.artist.name}` })
                         if (res.loadType != 'SEARCH_RESULT') {
                           if (index === x.tracks.data.length) return resolve(res)
                           return;
@@ -529,7 +603,7 @@ class PlayerFunctions {
           
                         let info = { ...res.tracks[0].info,  author: x2.artist.name, length: x.duration * 1000, artwork: track[1] === 'playlist' ? x.picture_xl : x.cover_xl, position: index, title: x2.title, uri: x2.link, sourceName: 'deezer' }
           
-                        response.tracks.push({ track: Utils.encodeTrack({ ...info, sourceName: 'youtube' }), info })
+                        response.tracks.push({ encoded: Utils.encodeTrack({ ...info, sourceName: 'youtube' }), info })
           
                         if (response.tracks.length === x.tracks.data.length) {
                           response.tracks.sort((a, b) => a.info.position - b.info.position)
@@ -540,13 +614,13 @@ class PlayerFunctions {
                     }
                   }
                 })
-              } else {
-                Utils.search(music, true).then((res) => resolve(res))
               }
               break
             }
           }
         })
+      } else {
+        this.makeLavalinkRequest('search', { identifier: music }).then((res) => resolve(res))
       }
     })
   }
@@ -557,11 +631,19 @@ class PlayerFunctions {
    */
   skip() {
     if (Infos.Configs.Queue) {
-      let guildQueue = map.get('queue') || {}
+      let queue = map.get('queue') || {}
       let players = map.get('players') || {}
 
-      if (guildQueue[this.config.guildId] && guildQueue[this.config.guildId][1]) {
-        Infos.LoadBalancing[players[this.config.guildId].node].Ws.emit('message', JSON.stringify({ op: 'event', type: 'TrackEndEvent', guildId: this.config.guildId, reason: 'FAKE_TRACK_END_SKIP', track: guildQueue[this.config.guildId][1] }))
+      if (queue[this.config.guildId] && queue[this.config.guildId][1]) {
+        this.makeLavalinkRequest('play', { identifier: queue[this.config.guildId][1] })
+
+        queue[this.config.guildId].shift()
+        map.set('queue', queue)
+
+        if (players[this.config.guildId]) {
+          players[this.config.guildId] = { ...players[this.config.guildId], playing: true }
+          map.set('players', players)
+        }
       }
     }
   }
@@ -573,11 +655,10 @@ class PlayerFunctions {
   stop() {
     let players = map.get('players') || {}
 
-    let response = sendJson({ op: 'stop', guildId: this.config.guildId }, players[this.config.guildId].node)
-    if (response.error === true) throw new Error(response.message)
+    this.makeLavalinkRequest('stop', null)
 
     if (players[this.config.guildId]) {
-      players[this.config.guildId] = { ...players[this.config.guildId], playing: false, track: null }
+      players[this.config.guildId] = { ...players[this.config.guildId], playing: false }
         
       if (Infos.Configs.Queue) {
         let queue = map.get('queue') || {}
@@ -597,8 +678,7 @@ class PlayerFunctions {
   destroy() {
     let players = map.get('players') || {}
 
-    let response = sendJson({ op: 'destroy', guildId: this.config.guildId }, players[this.config.guildId].node)
-    if (response.error === true) throw new Error(response.message)
+    this.makeLavalinkRequest('destroy', null)
       
     if (Infos.Configs.Queue) {
       let queue = map.get('queue') || {}
@@ -634,10 +714,7 @@ class PlayerFunctions {
   setVolume(volume) {
     if (typeof volume != 'string' && typeof volume != 'number') throw new Error('volume field must be a string or a number.')
 
-    let players = map.get('players') || {}
-
-    let response = sendJson({ op: 'volume', guildId: this.config.guildId, volume }, players[this.config.guildId].node)
-    if (response.error === true) throw new Error(response.message)
+    this.makeLavalinkRequest('volume', { volume })
   }
 
   /**
@@ -653,8 +730,7 @@ class PlayerFunctions {
     players[this.config.guildId] = { ...players[this.config.guildId], playing: pause === true ? false : true, paused: pause }
     map.set('players', players)
 
-    let response = sendJson({ op: 'pause', guildId: this.config.guildId, pause }, players[this.config.guildId].node)
-    if (response.error === true) throw new Error(response.message)
+    Utils.makeLavalinkRequest(players[this.config.guildId].node, 'pause', { pause })
   }
 
   /**
@@ -673,7 +749,7 @@ class PlayerFunctions {
         if (position === 0) {
           if (!guildQueue[this.config.guildId][1]) throw new Error('Queue is empty, cannot remove track.')
 
-          Infos.LoadBalancing[players[this.config.guildId].node].Ws.emit('message', JSON.stringify({ op: 'event', type: 'TrackEndEvent', guildId: this.config.guildId, reason: 'FAKE_TRACK_END_SKIP', track: guildQueue[this.config.guildId][1] }))
+          this.skip()
         }
       } else {
         if (!guildQueue[this.config.guildId][position]) throw new Error('There is no track with this position, cannot remove track.')
@@ -701,13 +777,7 @@ class PlayerFunctions {
 
   static setFilter(body) {
     let players = map.get('players') || {}
-
-    let response = sendJson({
-      op: 'filters',
-      guildId: this.config.guildId,
-      ...body
-    }, players[this.config.guildId].node)
-    if (response.error === true) throw new Error(response.message)
+    Utils.makeLavalinkRequest(players[this.config.guildId].node, 'filters', { filter: body })
   }
 
   /**
@@ -739,14 +809,12 @@ class PlayerFunctions {
   }
 
   /**
-   * Send a payload to the Lavalink.
-   * @returns {Error | undefined} Will error if it fails to send the message to a Lavalink node.
+   * Decoded a track, and returns it's music info.
+   * @param {string} track - Track that will be decoded into the music informations.
+   * @returns {musicInfo} The informations about the music.
    */
-  sendPayload(payload) {
-    let players = map.get('players') || {}
-
-    let response = sendJson(payload, players[this.config.guildId].node)
-    if (response.error === true) throw new Error(response.message)
+  decodeTrack(track) {
+    return this.makeLavalinkRequest('decodetrack', { track })
   }
 }
 
