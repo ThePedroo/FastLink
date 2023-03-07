@@ -16,7 +16,7 @@ function makeRequest(url, options) {
   return new Promise((resolve) => {
     let req, data = ''
 
-    options.headers['User-Agent'] = 'FastLink@1.4.0'
+    options.headers['User-Agent'] = 'FastLink@1.4.1'
 
     let request = https.request
     if (url.startsWith('http://')) request = http.request
@@ -42,58 +42,54 @@ function makeRequest(url, options) {
   })
 }
 
-function reconnect(ws, Infos, map, x, informations) {
-  ws = new WebSocket(`${x.secure ? 'wss://' : 'ws://'}${x.hostname}${x.port != undefined ? `:${x.port}` : ''}`, undefined, {
+function reconnect(ws, Infos, map, node, informations) {
+  ws = new WebSocket(`${node.secure ? 'wss://' : 'ws://'}${node.hostname}${node.port != undefined ? `:${node.port}` : ''}`, undefined, {
     headers: {
-      Authorization: x.password,
+      Authorization: node.password,
       'Num-Shards': informations.shards,
       'User-Id': informations.botId,
-      'Client-Name': 'Fastlink@1.4.0'
+      'Client-Name': 'Fastlink@1.4.1'
     }
   })
-  ws.on('open', () => onOpen(Infos, ws, x))
+  ws.on('open', () => onOpen(Infos, ws, node))
   ws.on('close', (code) => {
-    let res = onClose(code, ws, Infos, map, x, informations)
+    let res = onClose(code, ws, Infos, map, node, informations)
     Infos = res.Infos
     ws = res.ws
   })
-  ws.on('error', (error) => onError(error, x))
+  ws.on('error', (error) => onError(error, node))
   ws.on('message', (data) => {
-    Infos = onMessage(data, Infos, map, x)
+    Infos = onMessage(data, Infos, map, node)
   })
   return { ws, Infos }
 }
 
-function onOpen(Infos, ws, x) {
-  Infos.Nodes[`${x.hostname}${x.port != undefined ? `:${x.port}` : ''}`] = { Ws: ws, password: x.password, port: x.port || 443, stats: {} }
-
-  debug(`Node ${x.hostname}${x.port != undefined ? `:${x.port}` : ''} connected`)
-  Event.emit('nodeConnect', (x))
+function onOpen(Infos, ws, node) {
+  debug(`Node ${node.hostname}${node.port != undefined ? `:${node.port}` : ''} connected`)
+  Event.emit('nodeConnect', (node))
 }
 
-function onClose(code, ws, Infos, map, x, informations) {
-  debug(`Node ${x.hostname}${x.port != undefined ? `:${x.port}` : ''} closed connection with code ${code}.`)
+function onClose(code, ws, Infos, map, node, informations) {
+  debug(`Node ${node.hostname}${node.port != undefined ? `:${node.port}` : ''} closed connection with code ${code}.`)
 
-  let node = Infos.Nodes[`${x.hostname}${x.port != undefined ? `:${x.port}` : ''}`]
+  let nodeInfo = Infos.Nodes[`${node.hostname}${node.port != undefined ? `:${node.port}` : ''}`]
 
-  if (!node) node = { Reconnects: 0 }
-
-  if (Infos.Configs.MaxTries <= -1 || node.Reconnects <= Infos.Configs.MaxTries) {
+  if (Infos.Configs.MaxTries <= -1 || nodeInfo.reconnects <= Infos.Configs.MaxTries) {
     setTimeout(() => {
-      let res = reconnect(ws, Infos, map, x, informations)
+      let res = reconnect(ws, Infos, map, node, informations)
       Infos = res.Infos
       ws = res.ws
     }, Infos.Configs.Delay)
   } else {
-    node.Reconnects++
+    nodeInfo.reconnects++
 
     let players = map.get('players') || {}
     let queues = map.get('queues') || {}
 
-    Object.keys(players).map((x) => {
-      if (players[x].node == `${x.hostname}${x.port != undefined ? `:${x.port}` : ''}`) {
-        delete players[x]
-        delete queues[x]
+    Object.keys(players).forEach((node) => {
+      if (players[node].node == `${node.hostname}${node.port != undefined ? `:${node.port}` : ''}`) {
+        delete players[node]
+        delete queues[node]
       }
     })
 
@@ -101,20 +97,19 @@ function onClose(code, ws, Infos, map, x, informations) {
     map.set('queues', queues)
 
     debug('Removed all players related to the offline node.')
-    Event.emit('nodeClosed', (x, code))
+    Event.emit('nodeClosed', (node, code))
   }
-  Infos.Nodes[`${x.hostname}${x.port != undefined ? `:${x.port}` : ''}`] = node
 
   return { ws, Infos }
 }
 
-function onError(error, x) {
-  debug(`Failed to connect to node ${x.hostname}${x.port != undefined ? `:${x.port}` : ''}, Error: ${error}`)
+function onError(error, node) {
+  debug(`Failed to connect to node ${node.hostname}${node.port != undefined ? `:${node.port}` : ''}, Error: ${error}`)
 
-  Event.emit('nodeError', (x, error))
+  Event.emit('nodeError', (node, error))
 }
 
-function onMessage(data, Infos, map, x) {
+function onMessage(data, Infos, map, node) {
   if (data) data = JSON.parse(data)
 
   Event.emit('raw', data)
@@ -126,14 +121,14 @@ function onMessage(data, Infos, map, x) {
     case 'ready': {
       delete data.op
       
-      Infos.Nodes[`${x.hostname}${x.port != undefined ? `:${x.port}` : ''}`].sessionId = data.sessionId
+      Infos.Nodes[`${node.hostname}${node.port != undefined ? `:${node.port}` : ''}`].sessionId = data.sessionId
 
       Event.emit('ready', data)
     }
     case 'stats': {
       delete data.op
 
-      Infos.Nodes[`${x.hostname}${x.port != undefined ? `:${x.port}` : ''}`].stats = data
+      Infos.Nodes[`${node.hostname}${node.port != undefined ? `:${node.port}` : ''}`].stats = data
 
       Event.emit('stats', data)
       break
@@ -290,4 +285,87 @@ function getEvent() {
   return Event
 }
 
-export default { makeRequest, debug, onOpen, onClose, onError, onMessage, getEvent }
+class EncodeClass {
+  constructor(size) {
+    this.position = 0
+    this.buffer = Buffer.alloc(size || 256)
+  }
+
+  changeBytes(bytes) {
+    if (this.position + bytes >= this.buffer.length) {
+      const newBuffer = Buffer.alloc(Math.max(this.buffer.length * 2, this.position + bytes))
+      this.buffer.copy(newBuffer)
+      this.buffer = newBuffer
+    }
+    this.position += bytes
+    return this.position - bytes
+  }
+
+  write(type, value) {
+    switch (type) {
+      case 'byte': {
+        this.buffer[this.changeBytes(1)] = value
+        break
+      }
+      case 'unsignedShort': {
+        this.buffer.writeUInt16BE(value, this.changeBytes(2))
+        break
+      }
+      case 'int': {
+        this.buffer.writeInt32BE(value, this.changeBytes(4))
+        break
+      }
+      case 'long': {
+        const msb = value / BigInt(2 ** 32)
+        const lsb = value % BigInt(2 ** 32)
+
+        this.write('int', Number(msb))
+        this.write('int', Number(lsb))
+        break
+      }
+      case 'utf': {
+        const len = Buffer.byteLength(value, 'utf8')
+        this.write('unsignedShort', len)
+        const start = this.changeBytes(len)
+        this.buffer.write(value, start, len, 'utf8')
+        break
+      }
+      default: {
+        throw new Error(`Unknown type ${type}, please report that.`)
+      }
+    }
+  }
+
+  result() {
+    return this.buffer.slice(0, this.position)
+  }
+}
+
+function encodeTrack(obj) {
+  const buf = new EncodeClass()
+
+  buf.write('byte', 3)
+  buf.write('utf', obj.title)
+  buf.write('utf', obj.author)
+  buf.write('long', BigInt(obj.length))
+  buf.write('utf', obj.identifier)
+  buf.write('byte', obj.isStream ? 1 : 0)
+  buf.write('byte', obj.uri ? 1 : 0)
+  if (obj.uri) buf.write('utf', obj.uri)
+  buf.write('byte', obj.artworkUrl ? 1 : 0)
+  if (obj.artworkUrl) buf.write('utf', obj.artworkUrl)
+  buf.write('byte', obj.isrc ? 1 : 0)
+  if (obj.isrc) buf.write('utf', obj.isrc)
+  buf.write('utf', obj.sourceName)
+  buf.write('long', BigInt(obj.position))
+
+  const buffer = buf.result()
+  const result = Buffer.alloc(buffer.length + 4)
+
+  result.writeInt32BE(buffer.length | (1 << 30))
+  buffer.copy(result, 4)
+
+  return result.toString('base64')
+}
+
+export default { makeRequest, debug, onOpen, onClose, onError, onMessage, getEvent, encodeTrack }

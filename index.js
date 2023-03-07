@@ -31,15 +31,18 @@ function connectNodes(object) {
   if (!object || !Array.isArray(object.nodes) || Object(object.informations) != object.informations)
     throw new Error(`${Array.isArray(object.nodes) ? 'nodes key must be an array' : Object(object) === object ? 'informations key must be an object' : ''}.`)
 
-  if (object.nodes.length === 0)
+  if (object.nodes.length == 0)
     throw new Error('First parameter must be an array with at least one object in it.')
 
   if (object.informations.market && typeof object.informations.market != 'string')
     throw new Error('Info\'s market must be a string.')
+
   if (typeof object.informations.shards != 'number')
     throw new Error('Info\'s shards field must be a number.')
+
   if (typeof object.informations.botId != 'string' && object.informations.botId != 'number')
     throw new Error('Info\'s botId field must be a string or a number.')
+
   if (object.informations.reconnect) {
     if (object.informations.reconnect.tries && typeof object.informations.reconnect.tries != 'number')
       throw new Error('Info\'s reconnect tries must be a number.')
@@ -54,7 +57,6 @@ function connectNodes(object) {
   Infos.sendDiscordPayload = object.sendDiscordPayload
 
   Infos.Configs = {
-    'SpotifyToken': null,
     'SpotifyMarket': object.informations.market || 'US',
     'UserId': object.informations.botId,
     'Queue': object.informations.autoQueue || false,
@@ -67,34 +69,36 @@ function connectNodes(object) {
     method: 'GET'
   }).then((spotify) => Infos.Configs.SpotifyToken = spotify.accessToken)
 
-  object.nodes.forEach((x) => {
-    if (typeof x.hostname != 'string')
+  object.nodes.forEach((node) => {
+    if (typeof node.hostname != 'string')
       throw new Error('node\'s hostname field must be a string.')
-    if (typeof x.secure != 'boolean')
+    if (typeof node.secure != 'boolean')
       throw new Error('node\'s secure field must be a boolean.')
-    if (x.port && typeof x.port != 'number' || x.port > 65535 || x.port < 0)
+    if (node.port && typeof node.port != 'number' || node.port > 65535 || node.port < 0)
       throw new Error('node\'s port field must be a number from the range of 0 to')
-    if (x.password && typeof x.password != 'string')
+    if (node.password && typeof node.password != 'string')
       throw new Error('node\'s password must be a string.') 
 
-    let ws = new WebSocket(`${x.secure ? 'wss://' : 'ws://'}${x.hostname}${x.port != undefined ? `:${x.port}` : ''}/v4/websocket`, undefined, {
+    let ws = new WebSocket(`${node.secure ? 'wss://' : 'ws://'}${node.hostname}${node.port != undefined ? `:${node.port}` : ''}/v4/websocket`, undefined, {
       headers: {
-        Authorization: x.password,
+        Authorization: node.password,
         'Num-Shards': object.informations.shards,
         'User-Id': object.informations.botId,
-        'Client-Name': 'Fastlink@1.4.0'
+        'Client-Name': 'Fastlink@1.4.1'
       }
     })
 
-    ws.on('open', () => Utils.onOpen(Infos, ws, x))
+    Infos.Nodes[`${node.hostname}${node.port != undefined ? `:${node.port}` : ''}`] = { ws: ws, password: node.password, port: node.port || 443, stats: {}, reconnects: 0 }
+
+    ws.on('open', () => Utils.onOpen(Infos, ws, node))
     ws.on('close', (code) => {
-      let res = Utils.onClose(code, ws, Infos, map, x, object.informations)
+      let res = Utils.onClose(code, ws, Infos, map, node, object.informations)
       Infos = res.Infos
       ws = res.ws
     })
-    ws.on('error', (error) => Utils.onError(error, x))
+    ws.on('error', (error) => Utils.onError(error, node))
     ws.on('message', (data) => {
-      Infos = Utils.onMessage(data, Infos, map, x)
+      Infos = Utils.onMessage(data, Infos, map, node)
     })
   })
   
@@ -102,7 +106,7 @@ function connectNodes(object) {
 }
 
 function getRecommendedNode() {
-  let node = Object.values(Infos.Nodes).filter((x) => x.Ws?._readyState === 1).sort((b, a) => a.stats.cpu ? (a.stats.cpu.systemLoad / a.stats.cpu.cores) * 100 : 0 - b.Sttus.cpu ? (b.stats.cpu.systemLoad / b.stats.cpu.cores) * 100 : 0)[0]
+  let node = Object.values(Infos.Nodes).filter((node) => node.ws?._readyState === 1).sort((b, a) => a.stats.cpu ? (a.stats.cpu.systemLoad / a.stats.cpu.cores) * 100 : 0 - b.Sttus.cpu ? (b.stats.cpu.systemLoad / b.stats.cpu.cores) * 100 : 0)[0]
 
   if (!node) throw new Error('There are no nodes online.')
 
@@ -201,7 +205,7 @@ function createPlayer(config) {
 
   let players = map.get('players') || {}
 
-  let nodeUrl = getRecommendedNode().Ws._url
+  let nodeUrl = getRecommendedNode().ws._url
 
   players[config.guildId] = { voiceChannelId: config.voiceChannelId, playing: false, paused: false, node: nodeUrl.replace('ws://', '').replace('wss://', '').replace('/v4/websocket', ''), ssl: nodeUrl.startsWith('wss://') }
   map.set('players', players)
@@ -387,9 +391,9 @@ class PlayerFunctions {
       if (players[this.config.guildId].node) {
         players[this.config.guildId] = { ...players[this.config.guildId], playing: true, track, paused: false }
       } else {
-        Utils.debug('Node doesn\'t have a recommended node. This should not happen, please report this issue. FastLink will handle that for now.')
+        Utils.debug('Recommended node for a player was disconnected, finding new recommended node.')
         
-        let url = new URL(getRecommendedNode().Ws._url)
+        let url = new URL(getRecommendedNode().ws._url)
         
         players[this.config.guildId] = { voiceChannelId: this.config.voiceChannelId, playing: true, track, paused: false, node: url.host }   
       }
@@ -404,8 +408,7 @@ class PlayerFunctions {
    
         this.makeLavalinkRequest('play', {
           track,
-          noReplace,
-          pause: false
+          noReplace
         })
       }
 
@@ -413,8 +416,7 @@ class PlayerFunctions {
     } else {
       this.makeLavalinkRequest('play', {
         track,
-        noReplace,
-        pause: false
+        noReplace
       })
     }
 
@@ -437,14 +439,9 @@ class PlayerFunctions {
         track.tracks.forEach((x) => queue[this.config.guildId].push(x.track))
       } else {
         queue[this.config.guildId] = []
-
         track.tracks.forEach((x) => queue[this.config.guildId].push(x.track))
         
-        this.makeLavalinkRequest('play', {
-          track: queue[this.config.guildId][0],
-          noReplace: false,
-          pause: false
-        })
+        this.makeLavalinkRequest('play', { track: queue[this.config.guildId][0] })
 
         players[this.config.guildId] = { ...players[this.config.guildId], playing: true, paused: false }
         map.set('players', players)
@@ -492,6 +489,8 @@ class PlayerFunctions {
   
                 let info = { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, author: x.artists.map(artist => artist.name).join(', '), length: x.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.album.images[0].url, position: 0, title: x.name, uri: x.external_urls.spotify, sourceName: 'spotify' }
               
+                
+
                 resolve({ loadType: 'SEARCH_RESULT', playlistInfo: {}, tracks: [{ encoded: Utils.encodeTrack({ ...info, sourceName: 'youtube' }), info }] })
               })
               break
@@ -730,7 +729,7 @@ class PlayerFunctions {
     players[this.config.guildId] = { ...players[this.config.guildId], playing: pause === true ? false : true, paused: pause }
     map.set('players', players)
 
-    Utils.makeLavalinkRequest(players[this.config.guildId].node, 'pause', { pause })
+    Utils.makeLavalinkRequest('pause', { pause })
   }
 
   /**
@@ -777,7 +776,7 @@ class PlayerFunctions {
 
   static setFilter(body) {
     let players = map.get('players') || {}
-    Utils.makeLavalinkRequest(players[this.config.guildId].node, 'filters', { filter: body })
+    Utils.makeLavalinkRequest('filters', { filter: body })
   }
 
   /**
@@ -825,6 +824,5 @@ export default {
   createPlayer,
   getPlayer,
   getAllPlayers,
-  getAllQueues,
-  decodeTrack
+  getAllQueues
 }
