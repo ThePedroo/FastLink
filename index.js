@@ -66,7 +66,8 @@ function connectNodes(object) {
 
   Utils.makeRequest('https://open.spotify.com/get_access_token', {
     headers: {},
-    method: 'GET'
+    method: 'GET',
+    port: 443
   }).then((spotify) => Infos.Configs.SpotifyToken = spotify.accessToken)
 
   object.nodes.forEach((node) => {
@@ -106,7 +107,7 @@ function connectNodes(object) {
 }
 
 function getRecommendedNode() {
-  let node = Object.values(Infos.Nodes).filter((node) => node.ws?._readyState === 1).sort((b, a) => a.stats.cpu ? (a.stats.cpu.systemLoad / a.stats.cpu.cores) * 100 : 0 - b.Sttus.cpu ? (b.stats.cpu.systemLoad / b.stats.cpu.cores) * 100 : 0)[0]
+  let node = Object.values(Infos.Nodes).filter((node) => node.ws?._readyState === 1).sort((a, b) => a.stats.cpu ? (a.stats.cpu.systemLoad / a.stats.cpu.cores) * 100 : 0 - b.stats.cpu ? (b.stats.cpu.systemLoad / b.stats.cpu.cores) * 100 : 0)[0]
 
   if (!node) throw new Error('There are no nodes online.')
 
@@ -117,12 +118,14 @@ function makeSpotifyRequest(endpoint) {
   return new Promise((resolve) => {
     Utils.makeRequest(`https://api.spotify.com/v1${endpoint}`, {
       headers: { 'Authorization': `Bearer ${Infos.Configs.SpotifyToken}` },
-      method: 'GET'
+      method: 'GET',
+      port: 443
     }).then((res) => {
       if (res.error?.status === 401) {
         Utils.makeRequest('https://open.spotify.com/get_access_token', {
           headers: {}, 
-          method: 'GET'
+          method: 'GET',
+          port: 443
         }).then((spotify) => {
           Infos.Configs.SpotifyToken = spotify.accessToken
 
@@ -163,7 +166,8 @@ function handleRaw(data) {
                 sessionId: sessionIDs[data.d.guild_id]
               }
             },
-            method: 'PATCH'
+            method: 'PATCH',
+            port: Infos.Nodes[players[data.d.guild_id].node].port
           })
   
           delete sessionIDs[data.d.guild_id]
@@ -266,21 +270,23 @@ class PlayerFunctions {
             'Client-Name': 'FastLink',
             'User-Agent': 'https'
           },
+          body: options.body,
           method: 'PATCH',
-          body: options.body
+          port: Infos.Nodes[players[this.config.guildId].node].port
         })
         break;
       }
       case 'search': {
         let players = map.get('players') || {}
-        data = await Utils.makeRequest(`${players[this.config.guildId].ssl ? 'https://' : 'http://'}${players[this.config.guildId].node}/v4/loadtracks?identifier=ytsearch:${encodeURI(options.identifier)}`, {
+        data = await Utils.makeRequest(`${players[this.config.guildId].ssl ? 'https://' : 'http://'}${players[this.config.guildId].node}/v4/loadtracks?identifier=${options.identifier.startsWith('https://') ? encodeURI(options.identifier) : 'ytsearch:' + encodeURI(options.identifier)}`, {
           headers: {
             Authorization: Infos.Nodes[players[this.config.guildId].node].password,
             'Content-Type': 'application/json',
             'Client-Name': 'FastLink',
             'User-Agent': 'https'
           },
-          method: 'GET'
+          method: 'GET',
+          port: Infos.Nodes[players[this.config.guildId].node].port
         })
         break;
       }
@@ -302,14 +308,15 @@ class PlayerFunctions {
       }
       case 'destroy': {
         let players = map.get('players') || {}
-        data = await Utils.makeRequest(`${players[this.config.guildId].ssl ? 'https://' : 'http://'}${players[this.config.guildId].node}/v4/sessions/${Infos.Nodes[players[this.config.guildId].node].sessionId}/players/${this.config.guildId}?noReplace=${options.noReplace || 'false'}`, {
+        data = await Utils.makeRequest(`${players[this.config.guildId].ssl ? 'https://' : 'http://'}${players[this.config.guildId].node}/v4/sessions/${Infos.Nodes[players[this.config.guildId].node].sessionId}/players/${this.config.guildId}`, {
           headers: {
             Authorization: Infos.Nodes[players[this.config.guildId].node].password,
             'Content-Type': 'application/json',
             'Client-Name': 'FastLink',
             'User-Agent': 'https'
           },
-          method: 'DELETE'
+          method: 'DELETE',
+          port: Infos.Nodes[players[this.config.guildId].node].port
         })
         break;
       }
@@ -346,7 +353,8 @@ class PlayerFunctions {
             'Client-Name': 'FastLink',
             'User-Agent': 'https'
           },
-          method: 'GET'
+          method: 'GET',
+          port: Infos.Nodes[players[this.config.guildId].node].port
         })
         break;
       }
@@ -436,12 +444,12 @@ class PlayerFunctions {
       let players = map.get('players') || {}
         
       if (queue[this.config.guildId]) {
-        track.tracks.forEach((x) => queue[this.config.guildId].push(x.track))
+        track.tracks.forEach((x) => queue[this.config.guildId].push(x.encoded))
       } else {
         queue[this.config.guildId] = []
-        track.tracks.forEach((x) => queue[this.config.guildId].push(x.track))
-        
-        this.makeLavalinkRequest('play', { track: queue[this.config.guildId][0] })
+        this.makeLavalinkRequest('play', { track: track.tracks[0].encoded })
+  
+        track.tracks.forEach((x) => queue[this.config.guildId].push(x.encoded))
 
         players[this.config.guildId] = { ...players[this.config.guildId], playing: true, paused: false }
         map.set('players', players)
@@ -466,6 +474,8 @@ class PlayerFunctions {
       if (spotifyRegex.test(music)) {
         let track = spotifyRegex.exec(music)
 
+        console.log(track[1])
+
         let end; 
         switch (track[1]) {
           case 'track': { end = `/tracks/${track[2]}`; break }
@@ -479,17 +489,17 @@ class PlayerFunctions {
         }
 
         makeSpotifyRequest(end).then(async (x) => {
+          console.log(x)
           if (x.error?.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
           if (x.error) return resolve({ loadType: 'LOAD_FAILED', playlistInfo: {}, tracks: [], exception: { message: x.error.message, severity: 'UNKNOWN' } })
 
           switch (track[1]) {
             case 'track': {
               this.makeLavalinkRequest('search', { identifier: `${x.name} ${x.artists[0].name}` }).then((res) => {
+                console.log(res)
                 if (res.loadType != 'SEARCH_RESULT') return resolve(res)
   
-                let info = { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, author: x.artists.map(artist => artist.name).join(', '), length: x.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.album.images[0].url, position: 0, title: x.name, uri: x.external_urls.spotify, sourceName: 'spotify' }
-              
-                
+                let info = { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, author: x.artists.map(artist => artist.name).join(', '), length: x.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.album.images[0].url, position: 0, title: x.name, uri: x.external_urls.spotify, sourceName: 'spotify' }   
 
                 resolve({ loadType: 'SEARCH_RESULT', playlistInfo: {}, tracks: [{ encoded: Utils.encodeTrack({ ...info, sourceName: 'youtube' }), info }] })
               })
@@ -527,7 +537,7 @@ class PlayerFunctions {
                   response.tracks.sort((a, b) => a.info.position - b.info.position)
                   resolve(response)
                 }
-              })
+              })             
               break
             }
             case 'show': {
@@ -631,18 +641,11 @@ class PlayerFunctions {
   skip() {
     if (Infos.Configs.Queue) {
       let queue = map.get('queue') || {}
-      let players = map.get('players') || {}
 
       if (queue[this.config.guildId] && queue[this.config.guildId][1]) {
-        this.makeLavalinkRequest('play', { identifier: queue[this.config.guildId][1] })
+        this.makeLavalinkRequest('play', { track: queue[this.config.guildId][1] })
 
-        queue[this.config.guildId].shift()
         map.set('queue', queue)
-
-        if (players[this.config.guildId]) {
-          players[this.config.guildId] = { ...players[this.config.guildId], playing: true }
-          map.set('players', players)
-        }
       }
     }
   }
@@ -729,7 +732,7 @@ class PlayerFunctions {
     players[this.config.guildId] = { ...players[this.config.guildId], playing: pause === true ? false : true, paused: pause }
     map.set('players', players)
 
-    Utils.makeLavalinkRequest('pause', { pause })
+    this.makeLavalinkRequest('pause', { pause })
   }
 
   /**
@@ -742,22 +745,16 @@ class PlayerFunctions {
       if (typeof position != 'string' && typeof position != 'number') throw new Error('position field must be a string or a number.')
   
       let guildQueue = map.get('queue') || {}
-      let players = map.get('players') || {}
 
-      if (guildQueue[this.config.guildId] && guildQueue[this.config.guildId].length === 1) {
-        if (position === 0) {
-          if (!guildQueue[this.config.guildId][1]) throw new Error('Queue is empty, cannot remove track.')
+      if (!guildQueue[this.config.guildId][position]) throw new Error('There is no track with this position, cannot remove track.')
 
-          this.skip()
-        }
-      } else {
-        if (!guildQueue[this.config.guildId][position]) throw new Error('There is no track with this position, cannot remove track.')
-
+      if (position == 0) this.skip()
+      else {
         guildQueue[this.config.guildId][position] = null
         guildQueue[this.config.guildId] = guildQueue[this.config.guildId].filter((x) => x != null)
-
-        map.set('queue', guildQueue)
       }
+
+      map.set('queue', guildQueue)
     }
   }
 
@@ -775,8 +772,7 @@ class PlayerFunctions {
   }
 
   static setFilter(body) {
-    let players = map.get('players') || {}
-    Utils.makeLavalinkRequest('filters', { filter: body })
+    this.makeLavalinkRequest('filters', { filter: body })
   }
 
   /**
@@ -806,23 +802,15 @@ class PlayerFunctions {
       tremolo: { depth: 0.3, frequency: 14 } 
     })
   }
-
-  /**
-   * Decoded a track, and returns it's music info.
-   * @param {string} track - Track that will be decoded into the music informations.
-   * @returns {musicInfo} The informations about the music.
-   */
-  decodeTrack(track) {
-    return this.makeLavalinkRequest('decodetrack', { track })
-  }
 }
 
-export default { 
+export default {
   connectNodes,
   handleRaw,
   getAllLavalinkStats,
   createPlayer,
   getPlayer,
   getAllPlayers,
-  getAllQueues
+  getAllQueues,
+  decodeTrack: Utils.decodeTrack
 }

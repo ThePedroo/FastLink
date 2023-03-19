@@ -21,7 +21,7 @@ function makeRequest(url, options) {
     let request = https.request
     if (url.startsWith('http://')) request = http.request
 
-    req = request(url, { port: options.port || 443, method: options.method || 'GET', headers: options.headers }, (res) => {
+    req = request(url, { port: options.port, method: options.method || 'GET', headers: options.headers }, (res) => {
       res.on('data', (chunk) => data += chunk)
       res.on('end', () => {
         try {
@@ -175,6 +175,7 @@ function onMessage(data, Infos, map, node) {
 
                 queue[data.guildId].shift()
               }
+              if (data.reason == 'REPLACED') queue[data.guildId].shift()
             } else {
               delete queue[data.guildId]
             }
@@ -368,4 +369,92 @@ function encodeTrack(obj) {
   return result.toString('base64')
 }
 
-export default { makeRequest, debug, onOpen, onClose, onError, onMessage, getEvent, encodeTrack }
+class DecodeClass {
+  constructor(buffer) {
+    this.position = 0
+    this.buffer = buffer
+  }
+
+  changeBytes(bytes) {
+    this.position += bytes
+    return this.position - bytes
+  }
+
+  read(type) {
+    switch (type) {
+      case 'byte': {
+        return this.buffer[this.changeBytes(1)]
+      }
+      case 'unsignedShort': {
+        const result = this.buffer.readUInt16BE(this.changeBytes(2))
+        return result
+      }
+      case 'int': {
+        const result = this.buffer.readInt32BE(this.changeBytes(4))
+        return result
+      }
+      case 'long': {
+        const msb = BigInt(this.read('int'))
+        const lsb = BigInt(this.read('int'))
+
+        return msb * BigInt(2 ** 32) + lsb
+      }
+      case 'utf': {
+        const len = this.read('unsignedShort')
+        const start = this.changeBytes(len)
+        const result = this.buffer.toString('utf8', start, start + len)
+        return result
+      }
+    }
+  }
+}
+
+function decodeTrack(track) {
+  const buf = new DecodeClass(Buffer.from(track, 'base64'))
+
+  const version = ((buf.read('int') & 0xC0000000) >> 30 & 1) !== 0 ? buf.read('byte') : 1
+
+  switch (version) {
+    case 1: {
+      return {
+        title: buf.read('utf'),
+        author: buf.read('utf'),
+        length: Number(buf.read('long')),
+        identifier: buf.read('utf'),
+        isStream: buf.read('byte') == 1,
+        uri: null,
+        source: buf.read('utf'),
+        position: Number(buf.read('long'))
+      }
+    }
+    case 2: {
+      return {
+        title: buf.read('utf'),
+        author: buf.read('utf'),
+        length: Number(buf.read('long')),
+        identifier: buf.read('utf'),
+        isStream: buf.read('byte') == 1,
+        uri: buf.read('byte') == 1 ? buf.read('utf') : null,
+        source: buf.read('utf'),
+        position: Number(buf.read('long'))
+      }
+    }
+    case 3: {
+      return {
+        title: buf.read('utf'),
+        author: buf.read('utf'),
+        length: Number(buf.read('long')),
+        identifier: buf.read('utf'),
+        isSeekable: true,
+        isStream: buf.read('byte') == 1,
+        uri: buf.read('byte') == 1 ? buf.read('utf') : null,
+        artworkUrl: buf.read('byte') == 1 ? buf.read('utf') : null,
+        isrc: buf.read('byte') == 1 ? buf.read('utf') : null,
+        sourceName: buf.read('utf'),
+        position: Number(buf.read('long'))
+      }
+    }
+  }
+}
+
+export default { makeRequest, debug, onOpen, onClose, onError, onMessage, getEvent, encodeTrack, decodeTrack }
