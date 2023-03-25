@@ -770,6 +770,16 @@ class PlayerFunctions {
       return []
     }
   }
+  
+  setLoop(type) {
+    if (type == 'track') {
+      players[this.config.guildId] = { ...players[this.config.guildId], loop: type }
+    } else if(type == 'queue') {
+      players[this.config.guildId] = { ...players[this.config.guildId], loop: type }
+    } else if (type == 'off') {
+      players[this.config.guildId] = { ...players[this.config.guildId], loop: type } 
+    }
+  }
 
   static setFilter(body) {
     this.makeLavalinkRequest('filters', { filter: body })
