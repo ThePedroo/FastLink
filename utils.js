@@ -178,7 +178,7 @@ function onMessage(data, Infos, map, node) {
                     break;
                   case 'queue':
                     queue[data.guildId].shift()
-                    queue[data.guildId].push(queue[data.guildId][0]);
+                    queue[data.guildId].push(queue[data.guildId][0])
                     break;
                   default:
                     queue[data.guildId].shift()
