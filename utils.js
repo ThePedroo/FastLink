@@ -172,8 +172,18 @@ function onMessage(data, Infos, map, node) {
                     encodedTrack: queue[data.guildId][1]
                   }
                 })
-
-                queue[data.guildId].shift()
+                switch (players[data.guildId].loop) {
+                  case 'track':
+                    // Do not modify queue
+                    break;
+                  case 'queue':
+                    queue[data.guildId].shift()
+                    queue[data.guildId].push(queue[data.guildId][0])
+                    break;
+                  default:
+                    queue[data.guildId].shift()
+                    break;
+                }
               }
               if (data.reason == 'REPLACED') queue[data.guildId].shift()
             } else {
