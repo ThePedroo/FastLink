@@ -774,12 +774,16 @@ class PlayerFunctions {
   setLoop(type) {
     let players = map.get('players') || {}
     
-    if (type == 'track') {
-      players[this.config.guildId] = { ...players[this.config.guildId], loop: type }
-    } else if(type == 'queue') {
-      players[this.config.guildId] = { ...players[this.config.guildId], loop: type }
-    } else if (type == 'off') {
-      players[this.config.guildId] = { ...players[this.config.guildId], loop: type } 
+    switch (type) {
+      case 'track':
+        players[this.config.guildId] = { ...players[this.config.guildId], loop: 'track' }
+        break;
+      case 'queue':
+        players[this.config.guildId] = { ...players[this.config.guildId], loop: 'queue' }
+        break;
+      case 'off':
+        players[this.config.guildId] = { ...players[this.config.guildId], loop: 'off' }
+        break;
     }
   }
 
