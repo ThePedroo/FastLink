@@ -173,7 +173,15 @@ function onMessage(data, Infos, map, node) {
                   }
                 })
 
-                queue[data.guildId].shift()
+                if (players[data.guildId].loop == 'track') {
+                  // Do not modify queue
+                } else if(players[data.guildId].loop == 'queue') (
+                  queue[data.guildId].shift()
+                  queue[data.guildId].push(queue[data.guildId][0])
+                } else {
+                  queue[data.guildId].shift()
+                }
+              
               }
               if (data.reason == 'REPLACED') queue[data.guildId].shift()
             } else {
