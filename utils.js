@@ -177,11 +177,11 @@ function onMessage(data, Infos, map, node) {
                     // Do not modify queue
                     break;
                   case 'queue':
-                    queue[data.guildId].shift();
+                    queue[data.guildId].shift()
                     queue[data.guildId].push(queue[data.guildId][0]);
                     break;
                   default:
-                    queue[data.guildId].shift();
+                    queue[data.guildId].shift()
                     break;
                 }
               }
