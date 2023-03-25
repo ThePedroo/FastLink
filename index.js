@@ -772,6 +772,8 @@ class PlayerFunctions {
   }
   
   setLoop(type) {
+    let players = map.get('players') || {}
+    
     if (type == 'track') {
       players[this.config.guildId] = { ...players[this.config.guildId], loop: type }
     } else if(type == 'queue') {
