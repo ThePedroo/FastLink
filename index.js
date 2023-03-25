@@ -770,7 +770,30 @@ class PlayerFunctions {
       return []
     }
   }
-
+  
+ /**
+  * Sets the loop type of the player's queue.
+  * @returns {undefined} Won't return nothing.
+  */
+  setLoop(type) {
+    let players = map.get('players') || {}
+    
+    switch (type) {
+      case 'track':
+        players[this.config.guildId] = { ...players[this.config.guildId], loop: 'track' }
+        break;
+      case 'queue':
+        players[this.config.guildId] = { ...players[this.config.guildId], loop: 'queue' }
+        break;
+      case 'off':
+        players[this.config.guildId] = { ...players[this.config.guildId], loop: null }
+        break;
+      default:
+        players[this.config.guildId] = { ...players[this.config.guildId], loop: null }
+        break;
+    }
+  }
+  
   static setFilter(body) {
     this.makeLavalinkRequest('filters', { filter: body })
   }
