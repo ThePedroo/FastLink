@@ -21,6 +21,7 @@ function makeRequest(url, options) {
     let request = https.request
     if (url.startsWith('http://')) request = http.request
 
+    console.log('options hmmm', options)
     req = request(url, { port: options.port, method: options.method || 'GET', headers: options.headers }, (res) => {
       res.on('data', (chunk) => data += chunk)
       res.on('end', () => {
@@ -151,45 +152,125 @@ function onMessage(data, Infos, map, node) {
         case 'TrackEndEvent': {
           delete data.op
           delete data.type
-
+            console.log('triggered trackEnd event')
           if (Infos.Configs.Queue) {
             let queue = map.get('queue') || {}
             let players = map.get('players') || {}
-
+            console.log('start', queue[data.guildId])
             if (queue[data.guildId] && queue[data.guildId][1]) {
               if (data.reason == 'LOAD_FAILED') throw new Error('This is really bad, and shouldn\'t happen! Please report to the FastLink\'s owner ASAP.', data)
               
               if (data.reason == 'FINISHED') {
-                makeRequest(`${players[data.guildId].ssl ? 'https://' : 'http://'}${players[data.guildId].node}/v4/sessions/${Infos.Nodes[players[data.guildId].node].sessionId}/players/${data.guildId}`, {
-                  headers: {
-                    Authorization: Infos.Nodes[players[data.guildId].node].password,
-                    'Content-Type': 'application/json',
-                    'Client-Name': 'FastLink',
-                    'User-Agent': 'https'
-                  },
-                  method: 'PATCH',
-                  body: {
-                    encodedTrack: queue[data.guildId][1]
-                  }
-                })
+                //console.log('tracked finished', queue[data.guildId], Infos.Nodes[players[data.guildId].node])
+                let track;
                 switch (players[data.guildId].loop) {
                   case 'track':
-                    // Do not modify queue
+                    makeRequest(`${players[data.guildId].ssl ? 'https://' : 'http://'}${players[data.guildId].node}/v4/sessions/${Infos.Nodes[players[data.guildId].node].sessionId}/players/${data.guildId}`, {
+                      headers: {
+                        Authorization: Infos.Nodes[players[data.guildId].node].password,
+                        'Content-Type': 'application/json',
+                        'Client-Name': 'FastLink',
+                        'User-Agent': 'https'
+                      },
+                      method: 'PATCH',
+                      body: {
+                        encodedTrack: queue[data.guildId][0]
+                      },
+                      port: Infos.Nodes[players[data.guildId].node].port
+                    })
+                    
+                    Event.emit('newTrack', { textChannelId: players[data.guildId].textChannelId, track: queue[data.guildId][0] })
+
                     break;
                   case 'queue':
-                    queue[data.guildId].shift()
-                    queue[data.guildId].push(queue[data.guildId][0])
+                    makeRequest(`${players[data.guildId].ssl ? 'https://' : 'http://'}${players[data.guildId].node}/v4/sessions/${Infos.Nodes[players[data.guildId].node].sessionId}/players/${data.guildId}`, {
+                      headers: {
+                        Authorization: Infos.Nodes[players[data.guildId].node].password,
+                        'Content-Type': 'application/json',
+                        'Client-Name': 'FastLink',
+                        'User-Agent': 'https'
+                      },
+                      method: 'PATCH',
+                      body: {
+                        encodedTrack: queue[data.guildId][1]
+                      },
+                      port: Infos.Nodes[players[data.guildId].node].port
+                    })
+
+                    Event.emit('newTrack', { textChannelId: players[data.guildId].textChannelId, track: queue[data.guildId][1] })
+                    
+                    track = queue[data.guildId].shift()
+                    queue[data.guildId].push(track)
+                    
                     break;
                   default:
+                    makeRequest(`${players[data.guildId].ssl ? 'https://' : 'http://'}${players[data.guildId].node}/v4/sessions/${Infos.Nodes[players[data.guildId].node].sessionId}/players/${data.guildId}`, {
+                      headers: {
+                        Authorization: Infos.Nodes[players[data.guildId].node].password,
+                        'Content-Type': 'application/json',
+                        'Client-Name': 'FastLink',
+                        'User-Agent': 'https'
+                      },
+                      method: 'PATCH',
+                      body: {
+                        encodedTrack: queue[data.guildId][1]
+                      },
+                      port: Infos.Nodes[players[data.guildId].node].port
+                    })
+
+                    Event.emit('newTrack', { textChannelId: players[data.guildId].textChannelId, track: queue[data.guildId][1] })
                     queue[data.guildId].shift()
+
                     break;
                 }
               }
               if (data.reason == 'REPLACED') queue[data.guildId].shift()
-            } else {
-              delete queue[data.guildId]
-            }
+            } else if (queue[data.guildId] && queue[data.guildId][0]) {
+              switch (players[data.guildId].loop) {
+                case 'track':
+                  makeRequest(`${players[data.guildId].ssl ? 'https://' : 'http://'}${players[data.guildId].node}/v4/sessions/${Infos.Nodes[players[data.guildId].node].sessionId}/players/${data.guildId}`, {
+                    headers: {
+                      Authorization: Infos.Nodes[players[data.guildId].node].password,
+                      'Content-Type': 'application/json',
+                      'Client-Name': 'FastLink',
+                      'User-Agent': 'https'
+                    },
+                    method: 'PATCH',
+                    body: {
+                      encodedTrack: queue[data.guildId][0]
+                    },
+                    port: Infos.Nodes[players[data.guildId].node].port
+                  })
+                  
+                  Event.emit('newTrack', { textChannelId: players[data.guildId].textChannelId, track: queue[data.guildId][0] })
 
+                  break;
+                case 'queue':
+                  makeRequest(`${players[data.guildId].ssl ? 'https://' : 'http://'}${players[data.guildId].node}/v4/sessions/${Infos.Nodes[players[data.guildId].node].sessionId}/players/${data.guildId}`, {
+                    headers: {
+                      Authorization: Infos.Nodes[players[data.guildId].node].password,
+                      'Content-Type': 'application/json',
+                      'Client-Name': 'FastLink',
+                      'User-Agent': 'https'
+                    },
+                    method: 'PATCH',
+                    body: {
+                      encodedTrack: queue[data.guildId][0]
+                    },
+                    port: Infos.Nodes[players[data.guildId].node].port
+                  })
+
+                  Event.emit('newTrack', { textChannelId: players[data.guildId].textChannelId, track: queue[data.guildId][0] })
+
+                  break;
+                default:
+                  delete queue[data.guildId]
+                  break;
+                }
+              } else {
+                delete queue[data.guildId]
+              }
+            
             map.set('queue', queue)
           }
 
@@ -217,7 +298,8 @@ function onMessage(data, Infos, map, node) {
                 method: 'PATCH',
                 body: {
                   encodedTrack: queue[data.guildId][1]
-                }
+                },
+                port: Infos.Nodes[players[data.guildId].node].port
               })
 
               queue[data.guildId].shift()
@@ -252,7 +334,8 @@ function onMessage(data, Infos, map, node) {
                 method: 'PATCH',
                 body: {
                   encodedTrack: queue[data.guildId][1]
-                }
+                },
+                port: Infos.Nodes[players[data.guildId].node].port
               })
 
               queue[data.guildId].shift()

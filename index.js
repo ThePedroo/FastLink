@@ -179,7 +179,7 @@ function handleRaw(data) {
       case 'VOICE_STATE_UPDATE': {
         let sessionIDs = map.get('sessionIDs') || {}
         sessionIDs[data.d.guild_id] = data.d.session_id
-
+        console.log(data.d.member.user.id, Infos.Configs.UserId)
         if (data.d.member.user.id === Infos.Configs.UserId) map.set('sessionIDs', sessionIDs)
         break
       }
@@ -203,15 +203,16 @@ function getAllLavalinkStats() {
  */
 
 function createPlayer(config) {
-  if (config && typeof config != 'object') throw new Error('createPlayer parameter must be a object with guildId and voiceChannelId keys.')
+  if (config && typeof config != 'object') throw new Error('createPlayer parameter must be a object with guildId,  voiceChannelId and textChannelId keys.')
   if (typeof config.guildId != 'string' && typeof config.guildId != 'number') throw new Error('guildId field must be a string or a number.')
   if (typeof config.voiceChannelId != 'string' && typeof config.voiceChannelId != 'number') throw new Error('voiceChannelId field must be a string or a number.')
+  if (typeof config.textChannelId != 'string' && typeof config.textChannelId != 'number') throw new Error('textChannelId field must be a string or a number.')
 
   let players = map.get('players') || {}
 
   let nodeUrl = getRecommendedNode().ws._url
 
-  players[config.guildId] = { voiceChannelId: config.voiceChannelId, playing: false, paused: false, node: nodeUrl.replace('ws://', '').replace('wss://', '').replace('/v4/websocket', ''), ssl: nodeUrl.startsWith('wss://') }
+  players[config.guildId] = { voiceChannelId: config.voiceChannelId, textChannelId: config.textChannelId, playing: false, node: nodeUrl.replace('ws://', '').replace('wss://', '').replace('/v4/websocket', ''), ssl: nodeUrl.startsWith('wss://') }
   map.set('players', players)
 
   return (new PlayerFunctions(config))
@@ -227,8 +228,7 @@ function getPlayer(guildId) {
   if (typeof guildId != 'string' && typeof guildId != 'number') throw new Error('guildId field must be a string or a number.')
 
   let guildPlayer = map.get('players') || {}
-  
-  if (guildPlayer[guildId]) return (new PlayerFunctions({ guildId, voiceChannelId: guildPlayer[guildId].voiceChannelId }))
+  if (guildPlayer[guildId]) return (new PlayerFunctions({ guildId, voiceChannelId: guildPlayer[guildId].voiceChannelId, playing: guildPlayer[guildId].playing }))
 }
 
 /**
@@ -304,6 +304,8 @@ class PlayerFunctions {
             encodedTrack: null
           }
         })
+
+        console.log('henlo', data)
         break;
       }
       case 'destroy': {
@@ -331,7 +333,7 @@ class PlayerFunctions {
       case 'pause': {
         data = await this.makeLavalinkRequest('custom', {
           body: {
-            paused: options.pause
+            playing: options.playing
           }
         })
         break;
@@ -397,13 +399,13 @@ class PlayerFunctions {
     
     if (players[this.config.guildId]) {
       if (players[this.config.guildId].node) {
-        players[this.config.guildId] = { ...players[this.config.guildId], playing: true, track, paused: false }
+        players[this.config.guildId] = { ...players[this.config.guildId], playing: true, track }
       } else {
         Utils.debug('Recommended node for a player was disconnected, finding new recommended node.')
         
         let url = new URL(getRecommendedNode().ws._url)
         
-        players[this.config.guildId] = { voiceChannelId: this.config.voiceChannelId, playing: true, track, paused: false, node: url.host }   
+        players[this.config.guildId] = { voiceChannelId: this.config.voiceChannelId, playing: true, track, node: url.host }   
       }
     }
       
@@ -418,6 +420,8 @@ class PlayerFunctions {
           track,
           noReplace
         })
+
+        Event.emit('newTrack', { textChannelId: this.config.textChannelId, track: queue[this.config.guildId][0] })
       }
 
       map.set('queue', queue)
@@ -451,7 +455,7 @@ class PlayerFunctions {
   
         track.tracks.forEach((x) => queue[this.config.guildId].push(x.encoded))
 
-        players[this.config.guildId] = { ...players[this.config.guildId], playing: true, paused: false }
+        players[this.config.guildId] = { ...players[this.config.guildId], playing: true }
         map.set('players', players)
       }
       
@@ -474,7 +478,7 @@ class PlayerFunctions {
       if (spotifyRegex.test(music)) {
         let track = spotifyRegex.exec(music)
 
-        console.log(track[1])
+        // console.log(track[1]) - testing
 
         let end; 
         switch (track[1]) {
@@ -489,14 +493,14 @@ class PlayerFunctions {
         }
 
         makeSpotifyRequest(end).then(async (x) => {
-          console.log(x)
+          // console.log(x) - testing
           if (x.error?.status === 400) return resolve({ loadType: 'NO_MATCHES', playlistInfo: {}, tracks: [] })
           if (x.error) return resolve({ loadType: 'LOAD_FAILED', playlistInfo: {}, tracks: [], exception: { message: x.error.message, severity: 'UNKNOWN' } })
 
           switch (track[1]) {
             case 'track': {
               this.makeLavalinkRequest('search', { identifier: `${x.name} ${x.artists[0].name}` }).then((res) => {
-                console.log(res)
+                // console.log(res) - testing
                 if (res.loadType != 'SEARCH_RESULT') return resolve(res)
   
                 let info = { identifier: res.tracks[0].info.identifier, isSeekable: res.tracks[0].info.isSeekable, author: x.artists.map(artist => artist.name).join(', '), length: x.duration_ms, isStream: res.tracks[0].info.isStream, artwork: x.album.images[0].url, position: 0, title: x.name, uri: x.external_urls.spotify, sourceName: 'spotify' }   
@@ -646,6 +650,20 @@ class PlayerFunctions {
         this.makeLavalinkRequest('play', { track: queue[this.config.guildId][1] })
 
         map.set('queue', queue)
+      } else {
+        let players = map.get('players') || {}
+        this.makeLavalinkRequest('stop', null)
+
+        if (players[this.config.guildId]) {
+          players[this.config.guildId] = { ...players[this.config.guildId], playing: false }
+            
+          if (Infos.Configs.Queue) {
+            queue[this.config.guildId] = []
+            map.set('queue', queue)
+          }
+    
+          map.set('players', players)
+        }
       }
     }
   }
@@ -729,7 +747,7 @@ class PlayerFunctions {
 
     let players = map.get('players') || {}
 
-    players[this.config.guildId] = { ...players[this.config.guildId], playing: pause === true ? false : true, paused: pause }
+    players[this.config.guildId] = { ...players[this.config.guildId], playing: pause === true ? false : true }
     map.set('players', players)
 
     this.makeLavalinkRequest('pause', { pause })
@@ -792,6 +810,27 @@ class PlayerFunctions {
         players[this.config.guildId] = { ...players[this.config.guildId], loop: null }
         break;
     }
+  }
+
+  shuffle() {
+    let guildQueue = map.get('queue') || {}
+
+    const np = guildQueue[this.config.guildId].shift();
+    const shuffled = PlayerFunctions.shuffle_queue(guildQueue[this.config.guildId]);
+    shuffled.unshift(np);
+    guildQueue[this.config.guildId] = shuffled;
+    map.set('queue', guildQueue)
+  }
+
+  static shuffle_queue (array){
+    const arr = array.slice(0);
+    for(let i = arr.length -1; i >= 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      const temp = arr[i];
+      arr[i] = arr[j];
+      arr[j] = temp;
+    }
+    return arr;
   }
   
   static setFilter(body) {
