@@ -34,7 +34,8 @@ function makeRequest(url, options) {
     })
 
     req.on('error', (error) => {
-      throw new Error('Failed sending HTTP request to the Lavalink.', error)
+      console.error(error)
+      throw new Error('Error while sending a request to Lavalink.')
     })
 
     if (options.body) req.end(JSON.stringify(options.body))
@@ -167,10 +168,11 @@ function onMessage(data, Infos, map, node) {
                     'Client-Name': 'FastLink',
                     'User-Agent': 'https'
                   },
-                  method: 'PATCH',
                   body: {
                     encodedTrack: queue[data.guildId][1]
-                  }
+                  },
+                  method: 'PATCH',
+                  port: Infos.Nodes[players[data.guildId].node].port
                 })
                 switch (players[data.guildId].loop) {
                   case 'track':
@@ -214,10 +216,11 @@ function onMessage(data, Infos, map, node) {
                   'Client-Name': 'FastLink',
                   'User-Agent': 'https'
                 },
-                method: 'PATCH',
                 body: {
                   encodedTrack: queue[data.guildId][1]
-                }
+                },
+                method: 'PATCH',
+                port: Infos.Nodes[players[data.guildId].node].port
               })
 
               queue[data.guildId].shift()
@@ -249,10 +252,11 @@ function onMessage(data, Infos, map, node) {
                   'Client-Name': 'FastLink',
                   'User-Agent': 'https'
                 },
-                method: 'PATCH',
                 body: {
                   encodedTrack: queue[data.guildId][1]
-                }
+                },
+                method: 'PATCH',
+                port: Infos.Nodes[players[data.guildId].node].port
               })
 
               queue[data.guildId].shift()
